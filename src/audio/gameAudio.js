@@ -15,14 +15,13 @@ const PASS = {
 const PASS_PEAK = 3.53;   // 八個呼嘯檔最響的位置都在 3.5 秒
 const ONE = ['crash_heavy_01', 'crash_metal_01', 'crash_debris_01', 'glass_break_small_01', 'wall_scrape_01', 'engine_start_01', 'amb_motorway_night_loop'];
 const GEARS = [0, 60, 105, 150, 195, 235, 300];
-// 背景音樂：隨機輪播，快結束時淡出、同時淡入下一首（目前這 12 首是暫用的，換檔案只要改這份清單）
+// 背景音樂：隨機輪播。這 12 首長版都有自己的結尾，所以整首播完才接下一首，不做交叉淡化
 const BGM_BASE = `${import.meta.env.BASE_URL}audio/bgm/`;
 const BGM = [
-  'eb01_neon_overdrive', 'eb02_bayshore_lightning', 'eb03_redline_heart', 'eb04_midnight_junction',
-  'eb05_burning_asphalt', 'eb06_starlight_drift', 'eb07_king_of_the_highway', 'eb08_velocity_dream',
-  'eb09_ghost_of_the_tunnel', 'eb10_dawn_breaker', 'eb11_turbo_fantasy', 'eb12_final_lap_emperor',
+  'ebL01_neon_overdrive', 'ebL02_bayshore_lightning', 'ebL03_redline_heart', 'ebL04_midnight_junction',
+  'ebL05_burning_asphalt', 'ebL06_starlight_drift', 'ebL07_king_of_the_highway', 'ebL08_velocity_dream',
+  'ebL09_ghost_of_the_tunnel', 'ebL10_dawn_breaker', 'ebL11_turbo_fantasy', 'ebL12_final_lap_emperor',
 ];
-const XFADE = 7;          // 交叉淡化的秒數
 const MUSIC_LEVEL = 0.5;  // 音樂音量滑桿拉滿時的實際增益
 const ENGINE_LEVEL = 0.34; // 合成器全油門時約 −9 dBFS，會蓋掉所有錄音，所以壓下來
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -89,11 +88,11 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
     for (const d of decks) if (ctx.currentTime > d.killAt || (d.failed && d !== cur)) { d.el.pause(); d.src.disconnect(); d.el.removeAttribute('src'); decks.delete(d); }
     musicCool -= dt;
     if (!cur || cur.failed) {
-      if (musicCool <= 0) { if (cur) { cur.killAt = 0; } musicCool = 2; startTrack(1.5); }   // 檔案壞了就等 2 秒換下一首
+      if (musicCool <= 0) { if (cur) { cur.killAt = 0; } musicCool = 2; startTrack(cur ? 0.05 : 1.5); }   // 檔案壞了就等 2 秒換下一首
       return;
     }
     const el = cur.el;
-    if (el.ended || (Number.isFinite(el.duration) && el.duration - el.currentTime < XFADE)) { fadeOut(cur, XFADE); startTrack(XFADE); }
+    if (el.ended) { cur.killAt = 0; startTrack(0.05); }   // 播完才換下一首
   }
 
   function play(name, { gain = 1, rate = 1, pan = 0, offset = 0, fadeIn = 0, jitter = 0.05 } = {}) {
@@ -172,8 +171,8 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
     get decks() { return decks; },
     get musicVolume() { return musicVol; },
     set musicVolume(v) { musicVol = clamp(v, 0, 1); applyVolume(); },
-    /** 跳到下一首（一樣交叉淡化，但比較快） */
-    nextTrack() { if (bgmBus && cur && !suspended) { fadeOut(cur, 1.5); startTrack(1.5); } },
+    /** 跳到下一首：目前這首很快淡掉，下一首直接開始 */
+    nextTrack() { if (bgmBus && cur && !suspended) { fadeOut(cur, 0.6); startTrack(0.3); } },
 
     /** 一定要在使用者操作（點擊、按鍵）的處理函式裡呼叫 */
     start() {
