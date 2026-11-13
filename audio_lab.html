@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>賽車音效試聽台</title>
+<style>
+  :root { --bg:#0f1218; --panel:#171c25; --line:#2a3242; --text:#e7e9ee; --mute:#8b94a6; --acc:#ff8a2a; color-scheme:dark; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif; padding:20px max(16px,env(safe-area-inset-left,0px)); }
+  h1 { font-size:18px; margin:0 0 4px; } h2 { font-size:14px; color:var(--mute); margin:22px 0 8px; font-weight:500; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; max-width:900px; }
+  label { display:grid; grid-template-columns:7em 1fr 5em; align-items:center; gap:10px; margin:6px 0; color:var(--mute); }
+  input[type=range] { accent-color:var(--acc); }
+  output { font-family:Consolas,monospace; color:var(--text); text-align:right; }
+  button { font:inherit; color:var(--text); background:#222a37; border:1px solid var(--line); border-radius:7px; padding:6px 12px; cursor:pointer; margin:3px; }
+  button.on, button.primary { background:var(--acc); border-color:var(--acc); color:#1a0e02; font-weight:600; }
+  .grid { display:flex; flex-wrap:wrap; gap:2px; }
+  .note { color:var(--mute); font-size:12.5px; }
+</style>
+</head>
+<body>
+<h1>賽車音效試聽台</h1>
+<p class="note">程序化引擎（src/audio/carSynth.js）＋ public/audio/sfx 的錄音音效。開發時用 <code>npm run dev</code> 後開 /audio_lab.html。</p>
+
+<div class="card">
+  <div>
+    <button class="primary" id="start">啟動音效</button>
+    <button id="auto">自動示範：起步加速換檔</button>
+    <button id="shift">換檔</button>
+    <select id="cyl"><option value="4">直列四缸</option><option value="6" selected>直列六缸</option><option value="8">V8</option></select>
+    <label style="display:inline-flex;grid-template-columns:none"><input type="checkbox" id="turbo" checked> 渦輪</label>
+  </div>
+  <label>轉速 <input id="rpm" type="range" min="800" max="8200" value="900"><output id="rpmV">900</output></label>
+  <label>油門 <input id="thr" type="range" min="0" max="1" step="0.01" value="0"><output id="thrV">0</output></label>
+  <label>車速 m/s <input id="spd" type="range" min="0" max="80" value="0"><output id="spdV">0</output></label>
+  <label>打滑 <input id="slip" type="range" min="0" max="1" step="0.01" value="0"><output id="slipV">0</output></label>
+  <p class="note">鬆開高轉速油門會有渦輪洩壓「噗咻」與回火爆音；打滑大於 0.1 且有車速才會有輪胎尖叫。</p>
+</div>
+
+<h2>錄音音效（public/audio/sfx/）</h2>
+<div class="card grid" id="sfx"></div>
+
+<script type="module">
+import { createCarAudio, loadSfx, playSfx } from './src/audio/carSynth.js';
+const $ = id => document.getElementById(id);
+const FILES = ['engine_start_01','shift_paddle_01','shift_paddle_02','shift_paddle_03','horn_01','horn_02','horn_03',
+  'crash_light_01','crash_light_02','crash_light_03','crash_light_04','crash_light_05','crash_heavy_01','crash_metal_01','crash_debris_01',
+  'glass_break_01','glass_break_small_01','wall_scrape_01',
+  'passby_jdm_a_01','passby_jdm_a_02','passby_jdm_a_03','passby_jdm_b_01','passby_jdm_b_02','passby_jdm_b_03','passby_gt_01','passby_gt_02',
+  'amb_motorway_night_loop'];
+let ctx, car, ambient = null, autoT = null;
+
+function build() {
+  if (car) car.dispose();
+  car = createCarAudio(ctx, ctx.destination, { cylinders: +$('cyl').value, turbo: $('turbo').checked });
+}
+$('start').onclick = async () => {
+  ctx = ctx || new AudioContext(); await ctx.resume(); build();
+  $('start').textContent = '音效已啟動'; $('start').classList.remove('primary');
+};
+$('cyl').onchange = $('turbo').onchange = () => ctx && build();
+$('shift').onclick = () => car && car.shift();
+for (const id of ['rpm','thr','spd','slip']) $(id).oninput = () => $(id + 'V').textContent = $(id).value;
+
+// 簡易自動示範：0→全油門，紅線換檔，五檔後收油
+$('auto').onclick = () => {
+  if (!car) return;
+  if (autoT) { clearInterval(autoT); autoT = null; $('auto').classList.remove('on'); return; }
+  $('auto').classList.add('on');
+  const ratios = [3.6, 2.2, 1.6, 1.25, 1.0]; let gear = 0, v = 0, t = 0;
+  autoT = setInterval(() => {
+    t += 0.05;
+    const coasting = t > 14;
+    const thr = coasting ? 0 : 1;
+    v = Math.max(0, v + (coasting ? -6 : 9 / ratios[gear] * 1.2) * 0.05);
+    let rpm = 900 + v * ratios[gear] * 95;
+    if (!coasting && rpm > 7600 && gear < 4) { gear++; car.shift(); rpm = 900 + v * ratios[gear] * 95; }
+    if (coasting && gear > 0 && rpm < 3500) { gear--; }
+    const slip = !coasting && gear === 0 && v < 10 ? 0.6 : 0;
+    $('rpm').value = rpm; $('thr').value = thr; $('spd').value = v; $('slip').value = slip;
+    for (const id of ['rpm','thr','spd','slip']) $(id + 'V').textContent = (+$(id).value).toFixed(id === 'rpm' ? 0 : 2);
+    if (t > 22) { clearInterval(autoT); autoT = null; $('auto').classList.remove('on'); }
+  }, 50);
+};
+
+function tick() {
+  if (car) car.update({ rpm: +$('rpm').value, throttle: +$('thr').value, speed: +$('spd').value, slip: +$('slip').value });
+  requestAnimationFrame(tick);
+}
+tick();
+
+for (const f of FILES) {
+  const b = document.createElement('button'); b.textContent = f;
+  b.onclick = async () => {
+    ctx = ctx || new AudioContext(); await ctx.resume();
+    const buf = await loadSfx(ctx, 'audio/sfx/' + f + '.ogg');
+    if (f.endsWith('_loop')) {
+      if (ambient) { ambient.stop(); ambient = null; b.classList.remove('on'); return; }
+      ambient = playSfx(ctx, buf, { loop: true, gain: 0.7 }); b.classList.add('on');
+    } else playSfx(ctx, buf, { gain: 0.9 });
+  };
+  $('sfx').appendChild(b);
+}
+</script>
+</body>
+</html>

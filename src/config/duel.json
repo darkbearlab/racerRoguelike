@@ -1,0 +1,21 @@
+{
+  "challengeRange": 40,
+  "countdown": 3,
+  "threshold": 40,
+  "rateBase": 8,
+  "ratePerMeter": 0.08,
+  "rateCap": 24,
+  "targets": { "normal": 100, "elite": 140, "mystery": 140, "boss": 200 },
+  "loseMinutesByTier": { "normal": 15, "elite": 15, "mystery": 15, "boss": 30 },
+  "overtakeMargin": 5,
+  "breakaway": 400,
+  "stopKmh": 30,
+  "stopSeconds": 5,
+  "loseMinutes": 15,
+  "bounty": 100,
+  "bountyByTier": { "normal": 100, "elite": 160, "mystery": 200, "boss": 300 },
+  "rubberBand": { "enabled": true, "behind": 1.05, "ahead": 0.97 },
+  "spawnAhead": 320,
+  "skipBehind": 300,
+  "respawnDelay": 6
+}

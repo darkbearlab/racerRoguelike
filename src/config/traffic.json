@@ -1,0 +1,31 @@
+{
+  "maxCars": 40,
+  "densityPerKm": 16,
+  "spawnAheadMin": 900,
+  "spawnAheadMax": 1150,
+  "despawnBehind": 200,
+  "despawnAhead": 1400,
+  "minSpawnGap": 45,
+  "mergeTriggerDist": 520,
+  "mergeStartKmh": 35,
+  "blinkLeadMin": 1.5,
+  "blinkLeadMax": 2.5,
+  "laneChangeTime": 2.6,
+  "laneChangeEveryMin": 8,
+  "laneChangeEveryMax": 26,
+  "types": {
+    "sedan": { "weight": 5, "model": "trafficSedan", "len": 4.5, "wid": 1.7, "height": 1.4, "kmhMin": 75, "kmhMax": 100 },
+    "hatch": { "weight": 3, "model": "trafficHatch", "len": 3.8, "wid": 1.62, "height": 1.4, "kmhMin": 70, "kmhMax": 100 },
+    "van":   { "weight": 2, "model": "trafficVan", "len": 4.7, "wid": 1.72, "height": 1.95, "kmhMin": 65, "kmhMax": 95 },
+    "wagon": { "weight": 2, "model": "trafficWagon", "len": 4.55, "wid": 1.69, "height": 1.46, "kmhMin": 75, "kmhMax": 100 },
+    "taxi":  { "weight": 2, "model": "trafficTaxi", "color": "#c9a21c", "len": 4.6, "wid": 1.7, "height": 1.44, "kmhMin": 80, "kmhMax": 105 },
+    "pickup": { "weight": 1, "model": "trafficPickup", "len": 4.7, "wid": 1.69, "height": 1.6, "kmhMin": 65, "kmhMax": 90 },
+    "keivan": { "weight": 1, "model": "trafficKeiVan", "len": 3.3, "wid": 1.4, "height": 1.86, "kmhMin": 60, "kmhMax": 85 },
+    "truck": { "weight": 2, "fleet": true, "model": "trafficTruck", "len": 10.4, "wid": 2.46, "height": 3.6, "kmhMin": 60, "kmhMax": 80 },
+    "tanker": { "weight": 1, "fleet": true, "model": "trafficTanker", "len": 9.6, "wid": 2.46, "height": 3.3, "kmhMin": 60, "kmhMax": 78 },
+    "bus":   { "weight": 1, "fleet": true, "model": "trafficBus", "len": 10.8, "wid": 2.48, "height": 3.1, "kmhMin": 65, "kmhMax": 85 }
+  },
+  "rearEndKeep": 0.2,
+  "rearEndPush": 0.3,
+  "sideSwipeLoss": 0.04
+}

@@ -1,0 +1,94 @@
+{
+  "rules": {
+    "choiceSeconds": 10,
+    "lockSeconds": 0.6,
+    "skipBounty": 60,
+    "shopSeconds": 40,
+    "maxStack": 3,
+    "prices": { "common": 120, "rare": 220, "legendary": 380 },
+    "rarityWeights": {
+      "normal": { "common": 70, "rare": 25, "legendary": 5 },
+      "elite": { "common": 35, "rare": 48, "legendary": 17 },
+      "mystery": { "common": 20, "rare": 55, "legendary": 25 },
+      "boss": { "common": 15, "rare": 50, "legendary": 35 },
+      "shop": { "common": 50, "rare": 38, "legendary": 12 }
+    },
+    "guaranteeRareFor": ["elite", "mystery", "boss"]
+  },
+  "list": [
+    {
+      "id": "turbo", "name": "渦輪增壓器", "category": "part", "rarity": "common", "stackable": true,
+      "desc": "加速 +12%",
+      "effects": [{ "target": "car.power", "op": "mul", "value": 1.12 }]
+    },
+    {
+      "id": "tall_gears", "name": "高速齒輪比", "category": "part", "rarity": "common", "stackable": true,
+      "desc": "極速 +15 km/h",
+      "effects": [{ "target": "car.vMaxKmh", "op": "add", "value": 15 }]
+    },
+    {
+      "id": "semi_slicks", "name": "半熱熔胎", "category": "part", "rarity": "common", "stackable": true,
+      "desc": "抓地 +15%",
+      "effects": [
+        { "target": "car.latAccelMax", "op": "mul", "value": 1.15 },
+        { "target": "car.grip", "op": "mul", "value": 1.15 }
+      ]
+    },
+    {
+      "id": "big_calipers", "name": "強化煞車卡鉗", "category": "part", "rarity": "common", "stackable": true,
+      "desc": "煞車力 +20%",
+      "effects": [{ "target": "car.brakeDecel", "op": "mul", "value": 1.2 }]
+    },
+    {
+      "id": "slipstream_master", "name": "吸尾流大師", "category": "skill", "rarity": "rare", "stackable": false,
+      "desc": "吸尾流距離 ×1.5、效果 +50%",
+      "effects": [
+        { "target": "car.slipstreamRange", "op": "mul", "value": 1.5 },
+        { "target": "car.slipstreamDragCut", "op": "mul", "value": 1.5 }
+      ]
+    },
+    {
+      "id": "soft_scrape", "name": "柔和擦撞", "category": "skill", "rarity": "rare", "stackable": false,
+      "desc": "撞牆減速減半",
+      "effects": [
+        { "target": "car.wallLossGraze", "op": "mul", "value": 0.5 },
+        { "target": "car.wallLossHeadOn", "op": "mul", "value": 0.5 },
+        { "target": "car.wallScrapeDecel", "op": "mul", "value": 0.5 }
+      ]
+    },
+    {
+      "id": "unyielding", "name": "不屈", "category": "skill", "rarity": "rare", "stackable": false,
+      "desc": "被超車時保留 40% 分數",
+      "effects": [{ "target": "duel.keepOnOvertaken", "op": "set", "value": 0.4 }]
+    },
+    {
+      "id": "drift_boost", "name": "甩尾加速", "category": "skill", "rarity": "rare", "stackable": false,
+      "desc": "甩尾結束時獲得 1 秒短暫加速",
+      "effects": [],
+      "hook": "onDriftEnd", "action": "boost", "params": { "seconds": 1, "accel": 6, "minDrift": 0.6 }
+    },
+    {
+      "id": "last_resort", "name": "窮途末路", "category": "tradeoff", "rarity": "rare", "stackable": false,
+      "desc": "極速 +25 km/h，轉向力 −15%",
+      "effects": [
+        { "target": "car.vMaxKmh", "op": "add", "value": 25 },
+        { "target": "car.steerLow", "op": "mul", "value": 0.85 },
+        { "target": "car.steerHigh", "op": "mul", "value": 0.85 }
+      ]
+    },
+    {
+      "id": "gambler", "name": "賭徒", "category": "tradeoff", "rarity": "legendary", "stackable": false,
+      "desc": "得分速度 +30%，被超車時扣 5 分鐘",
+      "effects": [{ "target": "duel.scoreMul", "op": "mul", "value": 1.3 }],
+      "hook": "onOvertaken", "action": "loseTime", "params": { "minutes": 5 }
+    },
+    {
+      "id": "nighthawk", "name": "夜鷹", "category": "tradeoff", "rarity": "legendary", "stackable": false,
+      "desc": "得分門檻降為 25 m，車流密度 +30%",
+      "effects": [
+        { "target": "duel.threshold", "op": "set", "value": 25 },
+        { "target": "world.trafficDensityMul", "op": "mul", "value": 1.3 }
+      ]
+    }
+  ]
+}

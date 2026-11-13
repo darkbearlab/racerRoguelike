@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>車型展示</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #20242c; overflow: hidden; font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; color: #e8eef8; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+  #labels div { position: absolute; transform: translate(-50%, 0); font-size: 12px; letter-spacing: 1px; text-align: center; white-space: nowrap; text-shadow: 0 1px 3px #000; }
+  #hint { position: fixed; left: 12px; bottom: 10px; font-size: 12px; opacity: .7; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<div id="hint">網址加 ?view=side 看側面、?view=front 看正面、?view=rear 看車尾；預設是斜前方</div>
+<script type="module" src="/src/gallery.js"></script>
+</body>
+</html>

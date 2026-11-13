@@ -1,0 +1,46 @@
+{
+  "clock": {
+    "startMinute": 0,
+    "dawnMinute": 300,
+    "gameSecondsPerRealSecond": 25,
+    "choiceSlowdown": 0.25,
+    "warnMinutes": 30
+  },
+  "junction": {
+    "firstForkAt": 1300,
+    "forkAheadMin": 1250,
+    "forkAheadMax": 1500,
+    "altKeepAfterFork": 220,
+    "altLength": 1600
+  },
+  "nights": [
+    { "zone": "loop", "boss": "yasha", "weights": { "rival": 5, "elite": 1.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } },
+    { "zone": "bay", "boss": "typhoon", "weights": { "rival": 4, "elite": 2.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } },
+    { "zone": "mixed", "boss": "akatsuki", "weights": { "rival": 3, "elite": 3.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } }
+  ],
+  "boss": {
+    "afterDefeats": 4,
+    "spawnBehind": 150,
+    "spawnAfterFork": 320
+  },
+  "nodes": {
+    "weights": { "rival": 5, "elite": 2, "pa": 2 },
+    "rivalSpawnAfterFork": 420,
+    "skipDistance": 3000,
+    "paAfterFork": 380,
+    "paMinutes": 20
+  },
+  "shortcut": {
+    "startAfterFork": 300,
+    "length": 1500,
+    "refundMinutes": 20,
+    "extraCars": 14
+  },
+  "events": {
+    "weights": { "jam": 1, "police": 1, "mystery": 1 },
+    "jam": { "startAfterFork": 380, "length": 750, "cars": 24, "kmhMin": 28, "kmhMax": 46, "bounty": 80 },
+    "police": { "checkAfterFork": 750, "limitKmh": 100, "toleranceKmh": 5, "fineMinutes": 10, "bounty": 60 },
+    "mystery": { "bounty": 200 }
+  },
+  "trafficDensity": { "night": 0.8, "dawn": 1.4 }
+}

@@ -1,0 +1,44 @@
+{
+  "default": {
+    "name": "測試路段",
+    "road": {
+      "lanes": 3,
+      "laneWidth": 3.5,
+      "shoulder": 0.75,
+      "maxBankDeg": 6,
+      "hills": [
+        { "amp": 7, "wavelength": 1700, "phase": 0 },
+        { "amp": 3.2, "wavelength": 610, "phase": 1 },
+        { "amp": 0.9, "wavelength": 260, "phase": 2.2 }
+      ]
+    },
+    "maxHeadingDeg": 70,
+    "weights": { "straight": 3, "gentle": 3, "sharp": 1.5, "s": 1, "tunnel": 1, "merge": 1 }
+  },
+  "loop": {
+    "name": "夜環線",
+    "note": "急彎、S 彎、隧道多",
+    "weights": { "straight": 1.4, "gentle": 2, "sharp": 3, "s": 2.6, "tunnel": 2.6, "merge": 0.6 },
+    "straightRange": [150, 450],
+    "traffic": { "densityMul": 0.9, "typeWeights": { "sedan": 6, "van": 2, "truck": 1 } }
+  },
+  "bay": {
+    "name": "海堤線",
+    "note": "長直線、大彎，大貨車多",
+    "weights": { "straight": 5, "gentle": 3.5, "sharp": 0.25, "s": 0.4, "tunnel": 0.8, "merge": 1.2 },
+    "straightRange": [500, 1400],
+    "traffic": { "densityMul": 1.0, "typeWeights": { "sedan": 4, "van": 2, "truck": 5, "tanker": 3 } }
+  },
+  "mixed": {
+    "name": "混合路段",
+    "note": "兩者混合，車流最密",
+    "weights": { "straight": 3, "gentle": 3, "sharp": 1.8, "s": 1.4, "tunnel": 1.4, "merge": 1 },
+    "straightRange": [200, 900],
+    "traffic": { "densityMul": 1.35, "typeWeights": { "sedan": 6, "van": 2, "truck": 3 } }
+  },
+  "shortcut": {
+    "name": "捷徑",
+    "weights": { "straight": 0.5, "gentle": 1, "sharp": 4, "s": 3, "tunnel": 0, "merge": 0 },
+    "straightRange": [100, 220]
+  }
+}

@@ -1,0 +1,293 @@
+{
+  "_note": "全部是原創車型。比例取自 80–90 年代各類車款的公開尺寸範圍（車長、車寬、車高、軸距），不對應任何特定車款。單位：公尺、度。",
+
+  "coupe": {
+    "label": "雙門跑車（玩家）",
+    "L": 4.46, "W": 1.76, "H": 1.27, "wb": 2.5, "fo": 0.92, "clearance": 0.15, "wheelR": 0.315, "wheelW": 0.25,
+    "nose": { "h": 0.6, "drop": 0.14, "taper": 0.9 }, "cowlH": 0.9, "cowl": 0.78, "hoodCurve": 0.8,
+    "beltH": 0.91, "deck": { "h": 0.9, "len": 0.7 }, "tail": { "h": 0.88, "drop": 0.1, "taper": 0.93 },
+    "cabin": { "wsRake": 29, "rearRake": 21, "cPillar": 0.34, "tumble": 0.3 },
+    "tumble": 0.05, "crown": 0.11,
+    "lights": { "head": "slim", "tail": "wide" },
+    "extras": { "spoiler": "wing", "lip": true, "exhaust": "twin", "grille": "narrow" }
+  },
+
+  "hatch": {
+    "label": "輕量掀背",
+    "L": 3.92, "W": 1.64, "H": 1.36, "wb": 2.37, "fo": 0.78, "clearance": 0.17, "wheelR": 0.285, "wheelW": 0.2,
+    "nose": { "h": 0.7, "drop": 0.05, "taper": 0.97 }, "cowlH": 0.94, "cowl": 0.42,
+    "beltH": 0.95, "deck": { "h": 0.95, "len": 0.14 }, "tail": { "h": 0.94, "drop": 0.03, "taper": 0.98 },
+    "cabin": { "wsRake": 40, "rearRake": 56, "cPillar": 0.24, "tumble": 0.22 },
+    "tumble": 0.03, "crown": 0.08, "cladding": true, "bumperDark": true,
+    "lights": { "head": "rect", "tail": "rect" },
+    "extras": { "spoiler": "roof", "exhaust": "single", "grille": "wide" }
+  },
+
+  "sedan": {
+    "label": "四門運動房車",
+    "L": 4.6, "W": 1.7, "H": 1.38, "wb": 2.62, "fo": 0.88, "clearance": 0.16, "wheelR": 0.3, "wheelW": 0.22,
+    "nose": { "h": 0.72, "drop": 0.06, "taper": 0.96 }, "cowlH": 0.96, "cowl": 0.52,
+    "beltH": 0.97, "deck": { "h": 0.97, "len": 1.02 }, "tail": { "h": 0.95, "drop": 0.05, "taper": 0.96 },
+    "cabin": { "wsRake": 36, "rearRake": 38, "cPillar": 0.3, "tumble": 0.24 },
+    "tumble": 0.03, "crown": 0.09,
+    "lights": { "head": "quad", "tail": "rect" },
+    "extras": { "spoiler": "duck", "lip": true, "exhaust": "twin", "grille": "wide" }
+  },
+
+  "wedge": {
+    "label": "楔形中置引擎跑車",
+    "L": 4.2, "W": 1.74, "H": 1.19, "wb": 2.42, "fo": 1.0, "clearance": 0.13, "wheelR": 0.305, "wheelW": 0.25,
+    "nose": { "h": 0.47, "drop": 0.1, "taper": 0.86 }, "cowlH": 0.8, "cowl": 0.2,
+    "beltH": 0.88, "deck": { "h": 0.93, "len": 1.32 }, "tail": { "h": 0.92, "drop": 0.06, "taper": 0.97 },
+    "cabin": { "wsRake": 25, "rearRake": 70, "cPillar": 0.42, "tumble": 0.32, "bPillar": false },
+    "tumble": 0.06, "crown": 0.1,
+    "lights": { "head": "popup", "tail": "wide" },
+    "extras": { "intake": true, "exhaust": "twin", "spoiler": "duck" }
+  },
+
+  "gt": {
+    "label": "大型 GT 跑車",
+    "L": 4.56, "W": 1.82, "H": 1.26, "wb": 2.55, "fo": 0.98, "clearance": 0.14, "wheelR": 0.32, "wheelW": 0.27,
+    "nose": { "h": 0.58, "drop": 0.16, "taper": 0.88 }, "cowlH": 0.89, "cowl": 0.92, "hoodCurve": 0.7,
+    "beltH": 0.92, "deck": { "h": 0.94, "len": 0.5 }, "tail": { "h": 0.92, "drop": 0.08, "taper": 0.94 },
+    "cabin": { "wsRake": 27, "rearRake": 19, "cPillar": 0.4, "tumble": 0.32, "bPillar": false },
+    "tumble": 0.06, "crown": 0.12,
+    "lights": { "head": "rect", "tail": "quad" },
+    "extras": { "spoiler": "big", "lip": true, "skirts": true, "exhaust": "twin", "vents": true }
+  },
+
+  "gtWing": {
+    "label": "GT 跑車（進氣口版）",
+    "L": 4.5, "W": 1.8, "H": 1.28, "wb": 2.52, "fo": 0.95, "clearance": 0.14, "wheelR": 0.32, "wheelW": 0.26,
+    "nose": { "h": 0.62, "drop": 0.12, "taper": 0.92 }, "cowlH": 0.9, "cowl": 0.85,
+    "beltH": 0.93, "deck": { "h": 0.92, "len": 0.78 }, "tail": { "h": 0.9, "drop": 0.07, "taper": 0.95 },
+    "cabin": { "wsRake": 30, "rearRake": 26, "cPillar": 0.32, "tumble": 0.3 },
+    "tumble": 0.05, "crown": 0.11,
+    "lights": { "head": "quad", "tail": "slats" },
+    "extras": { "spoiler": "wing", "lip": true, "scoop": true, "exhaust": "single" }
+  },
+
+  "phantom": {
+    "label": "神秘車輛",
+    "L": 4.34, "W": 1.8, "H": 1.16, "wb": 2.46, "fo": 1.02, "clearance": 0.12, "wheelR": 0.31, "wheelW": 0.27,
+    "nose": { "h": 0.44, "drop": 0.08, "taper": 0.84 }, "cowlH": 0.78, "cowl": 0.3,
+    "beltH": 0.86, "deck": { "h": 0.9, "len": 1.2 }, "tail": { "h": 0.9, "drop": 0.04, "taper": 0.98 },
+    "cabin": { "wsRake": 23, "rearRake": 30, "cPillar": 0.5, "tumble": 0.34, "bPillar": false, "rearPanel": true },
+    "tumble": 0.07, "crown": 0.1,
+    "lights": { "head": "wide", "tail": "wide" },
+    "extras": { "intake": true, "diffuser": true, "skirts": true }
+  },
+
+  "bossCorner": {
+    "label": "Boss 夜叉：短軸距寬體",
+    "L": 4.2, "W": 1.86, "H": 1.21, "wb": 2.4, "fo": 0.86, "clearance": 0.11, "wheelR": 0.32, "wheelW": 0.3,
+    "nose": { "h": 0.56, "drop": 0.12, "taper": 0.94 }, "cowlH": 0.86, "cowl": 0.66,
+    "beltH": 0.9, "deck": { "h": 0.9, "len": 0.46 }, "tail": { "h": 0.9, "drop": 0.05, "taper": 0.98 },
+    "cabin": { "wsRake": 30, "rearRake": 24, "cPillar": 0.36, "tumble": 0.34 },
+    "tumble": 0.07, "crown": 0.12, "cladding": true,
+    "lights": { "head": "slim", "tail": "slats" },
+    "extras": { "spoiler": "big", "lip": true, "skirts": true, "canards": true, "fenders": true, "diffuser": true, "exhaust": "twin", "vents": true }
+  },
+
+  "bossSpeed": {
+    "label": "Boss 颶風：長尾低風阻",
+    "L": 4.86, "W": 1.84, "H": 1.15, "wb": 2.66, "fo": 1.04, "clearance": 0.11, "wheelR": 0.32, "wheelW": 0.28,
+    "nose": { "h": 0.46, "drop": 0.14, "taper": 0.8 }, "cowlH": 0.8, "cowl": 0.7, "hoodCurve": 0.65,
+    "beltH": 0.86, "deck": { "h": 0.88, "len": 1.0 }, "tail": { "h": 0.8, "drop": 0.1, "taper": 0.82 },
+    "cabin": { "wsRake": 22, "rearRake": 14, "cPillar": 0.6, "tumble": 0.36, "bPillar": false },
+    "tumble": 0.08, "crown": 0.13,
+    "lights": { "head": "wide", "tail": "wide" },
+    "extras": { "skirts": true, "diffuser": true, "exhaust": "twin", "lip": true }
+  },
+
+  "bossFinal": {
+    "label": "Boss 曉：黑色寬體 GT",
+    "L": 4.62, "W": 1.88, "H": 1.22, "wb": 2.58, "fo": 1.0, "clearance": 0.11, "wheelR": 0.33, "wheelW": 0.3,
+    "nose": { "h": 0.56, "drop": 0.16, "taper": 0.9 }, "cowlH": 0.87, "cowl": 0.95, "hoodCurve": 0.7,
+    "beltH": 0.91, "deck": { "h": 0.93, "len": 0.6 }, "tail": { "h": 0.92, "drop": 0.06, "taper": 0.96 },
+    "cabin": { "wsRake": 26, "rearRake": 20, "cPillar": 0.44, "tumble": 0.34, "bPillar": false },
+    "tumble": 0.07, "crown": 0.12,
+    "lights": { "head": "quad", "tail": "quad" },
+    "extras": { "spoiler": "big", "lip": true, "skirts": true, "fenders": true, "scoop": true, "diffuser": true, "exhaust": "twin" }
+  },
+
+  "trafficSedan": {
+    "label": "車流：方正房車",
+    "L": 4.5, "W": 1.7, "H": 1.4, "wb": 2.58, "fo": 0.86, "clearance": 0.18, "wheelR": 0.29, "wheelW": 0.19,
+    "nose": { "h": 0.74, "drop": 0.04, "taper": 0.98 }, "cowlH": 0.97, "cowl": 0.5,
+    "beltH": 0.98, "deck": { "h": 0.98, "len": 0.98 }, "tail": { "h": 0.97, "drop": 0.03, "taper": 0.98 },
+    "cabin": { "wsRake": 40, "rearRake": 44, "cPillar": 0.26, "tumble": 0.2 },
+    "tumble": 0.02, "crown": 0.07, "bumperDark": true,
+    "lights": { "head": "rect", "tail": "rect" }, "extras": { "grille": "wide" }
+  },
+
+  "trafficHatch": {
+    "label": "車流：小型掀背",
+    "L": 3.8, "W": 1.62, "H": 1.4, "wb": 2.32, "fo": 0.74, "clearance": 0.18, "wheelR": 0.275, "wheelW": 0.18,
+    "nose": { "h": 0.74, "drop": 0.04, "taper": 0.98 }, "cowlH": 0.96, "cowl": 0.38,
+    "beltH": 0.97, "deck": { "h": 0.97, "len": 0.12 }, "tail": { "h": 0.96, "drop": 0.02, "taper": 0.99 },
+    "cabin": { "wsRake": 42, "rearRake": 62, "cPillar": 0.22, "tumble": 0.2 },
+    "tumble": 0.02, "crown": 0.07, "cladding": true, "bumperDark": true,
+    "lights": { "head": "rect", "tail": "tall" }, "extras": { "grille": "wide" }
+  },
+
+  "trafficVan": {
+    "label": "車流：平頭廂型車",
+    "L": 4.7, "W": 1.72, "H": 1.95, "wb": 2.5, "fo": 1.0, "clearance": 0.2, "wheelR": 0.3, "wheelW": 0.2,
+    "nose": { "h": 0.98, "drop": 0.04, "taper": 0.98 }, "cowlH": 1.02, "cowl": -0.82,
+    "beltH": 1.04, "deck": { "h": 1.04, "len": 0.1 }, "tail": { "h": 1.03, "drop": 0.02, "taper": 0.99 },
+    "cabin": { "wsRake": 58, "rearRake": 80, "cPillar": 0.5, "tumble": 0.12, "bPillarAt": 0.3 },
+    "tumble": 0.01, "crown": 0.06, "bumperDark": true,
+    "lights": { "head": "rect", "tail": "tall" }, "extras": {}
+  },
+
+  "trafficTruck": {
+    "label": "車流：平頭貨車",
+    "L": 10.4, "W": 2.46, "H": 2.75, "wb": 6.2, "fo": 1.35, "clearance": 0.42, "wheelR": 0.48, "wheelW": 0.3,
+    "nose": { "h": 1.45, "drop": 0.04, "taper": 0.98 }, "cowlH": 1.5, "cowl": -1.15,
+    "beltH": 1.2, "deck": { "h": 1.1, "len": 8.0 }, "tail": { "h": 1.08, "drop": 0.02, "taper": 1.0 },
+    "cabin": { "wsRake": 72, "rearRake": 86, "cPillar": 0.5, "tumble": 0.08, "bPillar": false },
+    "tumble": 0.01, "crown": 0.1, "bumperDark": true,
+    "lights": { "head": "rect", "tail": "rect" },
+    "extras": { "mirrors": false, "cargo": { "h": 2.45 } }
+  },
+
+  "roadster": {
+    "label": "輕量敞篷雙座",
+    "L": 3.96, "W": 1.68, "H": 1.2, "wb": 2.28, "fo": 0.8, "clearance": 0.14, "wheelR": 0.29, "wheelW": 0.2,
+    "nose": { "h": 0.6, "drop": 0.12, "taper": 0.9 }, "cowlH": 0.84, "cowl": 0.72, "hoodCurve": 0.8,
+    "beltH": 0.85, "deck": { "h": 0.86, "len": 0.92 }, "tail": { "h": 0.84, "drop": 0.1, "taper": 0.92 },
+    "cabin": { "wsRake": 35, "rearRake": 40, "cPillar": 0.2, "tumble": 0.3, "open": true },
+    "tumble": 0.06, "crown": 0.12,
+    "lights": { "head": "round", "tail": "round" },
+    "extras": { "exhaust": "single", "grille": "narrow" }
+  },
+
+  "notch": {
+    "label": "方正雙門硬頂",
+    "L": 4.36, "W": 1.66, "H": 1.31, "wb": 2.44, "fo": 0.86, "clearance": 0.16, "wheelR": 0.295, "wheelW": 0.21,
+    "nose": { "h": 0.66, "drop": 0.05, "taper": 0.97 }, "cowlH": 0.9, "cowl": 0.62,
+    "beltH": 0.91, "deck": { "h": 0.91, "len": 0.96 }, "tail": { "h": 0.9, "drop": 0.03, "taper": 0.98 },
+    "cabin": { "wsRake": 33, "rearRake": 30, "cPillar": 0.36, "tumble": 0.24, "bPillar": false },
+    "tumble": 0.03, "crown": 0.08, "bumperDark": true,
+    "lights": { "head": "quad", "tail": "wide" },
+    "extras": { "spoiler": "duck", "louvers": true, "lip": true, "exhaust": "single", "grille": "narrow" }
+  },
+
+  "kei": {
+    "label": "輕型小跑車",
+    "L": 3.3, "W": 1.4, "H": 1.17, "wb": 2.24, "fo": 0.56, "clearance": 0.14, "wheelR": 0.265, "wheelW": 0.17,
+    "nose": { "h": 0.56, "drop": 0.1, "taper": 0.92 }, "cowlH": 0.8, "cowl": 0.5,
+    "beltH": 0.84, "deck": { "h": 0.88, "len": 0.86 }, "tail": { "h": 0.87, "drop": 0.06, "taper": 0.96 },
+    "cabin": { "wsRake": 30, "rearRake": 62, "cPillar": 0.3, "tumble": 0.26, "bPillar": false },
+    "tumble": 0.05, "crown": 0.1,
+    "lights": { "head": "round", "tail": "rect" },
+    "extras": { "intake": true, "exhaust": "single", "spoiler": "duck" }
+  },
+
+  "muscle": {
+    "label": "長車頭大馬力雙門",
+    "L": 4.82, "W": 1.86, "H": 1.33, "wb": 2.76, "fo": 0.94, "clearance": 0.16, "wheelR": 0.33, "wheelW": 0.28,
+    "nose": { "h": 0.7, "drop": 0.08, "taper": 0.95 }, "cowlH": 0.93, "cowl": 1.12, "hoodCurve": 0.9,
+    "beltH": 0.95, "deck": { "h": 0.97, "len": 0.62 }, "tail": { "h": 0.96, "drop": 0.04, "taper": 0.97 },
+    "cabin": { "wsRake": 31, "rearRake": 20, "cPillar": 0.5, "tumble": 0.28 },
+    "tumble": 0.04, "crown": 0.1,
+    "lights": { "head": "quad", "tail": "wide" },
+    "extras": { "spoiler": "duck", "scoop": true, "lip": true, "exhaust": "twin", "grille": "wide", "louvers": true }
+  },
+
+  "wagon": {
+    "label": "運動旅行車",
+    "L": 4.64, "W": 1.7, "H": 1.43, "wb": 2.62, "fo": 0.9, "clearance": 0.16, "wheelR": 0.3, "wheelW": 0.22,
+    "nose": { "h": 0.7, "drop": 0.07, "taper": 0.95 }, "cowlH": 0.95, "cowl": 0.5,
+    "beltH": 0.96, "deck": { "h": 0.96, "len": 0.14 }, "tail": { "h": 0.95, "drop": 0.03, "taper": 0.98 },
+    "cabin": { "wsRake": 34, "rearRake": 58, "cPillar": 0.2, "tumble": 0.22, "bPillarAt": 0.36, "pillars": [0.68] },
+    "tumble": 0.03, "crown": 0.09,
+    "lights": { "head": "slim", "tail": "tall" },
+    "extras": { "spoiler": "roof", "rack": true, "lip": true, "scoop": true, "exhaust": "twin", "grille": "narrow" }
+  },
+
+  "rally": {
+    "label": "寬體拉力掀背",
+    "L": 4.06, "W": 1.78, "H": 1.38, "wb": 2.48, "fo": 0.8, "clearance": 0.19, "wheelR": 0.31, "wheelW": 0.25,
+    "nose": { "h": 0.72, "drop": 0.06, "taper": 0.97 }, "cowlH": 0.95, "cowl": 0.44,
+    "beltH": 0.96, "deck": { "h": 0.96, "len": 0.2 }, "tail": { "h": 0.95, "drop": 0.03, "taper": 0.98 },
+    "cabin": { "wsRake": 38, "rearRake": 46, "cPillar": 0.3, "tumble": 0.26 },
+    "tumble": 0.03, "crown": 0.08, "cladding": true,
+    "lights": { "head": "quad", "tail": "rect" },
+    "extras": { "spoiler": "big", "fenders": true, "vents": true, "lip": true, "exhaust": "single", "grille": "wide" }
+  },
+
+  "luxury": {
+    "label": "大型豪華轎車",
+    "L": 4.96, "W": 1.8, "H": 1.4, "wb": 2.82, "fo": 0.92, "clearance": 0.15, "wheelR": 0.315, "wheelW": 0.24,
+    "nose": { "h": 0.74, "drop": 0.06, "taper": 0.96 }, "cowlH": 0.97, "cowl": 0.6,
+    "beltH": 0.98, "deck": { "h": 0.98, "len": 1.16 }, "tail": { "h": 0.96, "drop": 0.05, "taper": 0.96 },
+    "cabin": { "wsRake": 33, "rearRake": 33, "cPillar": 0.42, "tumble": 0.22 },
+    "tumble": 0.03, "crown": 0.09,
+    "lights": { "head": "rect", "tail": "wide" },
+    "extras": { "skirts": true, "lip": true, "exhaust": "twin", "grille": "wide" }
+  },
+
+  "trafficWagon": {
+    "label": "車流：旅行車",
+    "L": 4.55, "W": 1.69, "H": 1.46, "wb": 2.58, "fo": 0.86, "clearance": 0.18, "wheelR": 0.29, "wheelW": 0.19,
+    "nose": { "h": 0.74, "drop": 0.04, "taper": 0.98 }, "cowlH": 0.97, "cowl": 0.48,
+    "beltH": 0.98, "deck": { "h": 0.98, "len": 0.12 }, "tail": { "h": 0.97, "drop": 0.02, "taper": 0.99 },
+    "cabin": { "wsRake": 40, "rearRake": 70, "cPillar": 0.2, "tumble": 0.2, "bPillarAt": 0.34, "pillars": [0.66] },
+    "tumble": 0.02, "crown": 0.07, "bumperDark": true,
+    "lights": { "head": "rect", "tail": "tall" }, "extras": { "grille": "wide", "rack": true }
+  },
+
+  "trafficTaxi": {
+    "label": "車流：計程車",
+    "L": 4.6, "W": 1.7, "H": 1.44, "wb": 2.68, "fo": 0.84, "clearance": 0.18, "wheelR": 0.29, "wheelW": 0.19,
+    "nose": { "h": 0.76, "drop": 0.03, "taper": 0.98 }, "cowlH": 0.98, "cowl": 0.5,
+    "beltH": 0.99, "deck": { "h": 0.99, "len": 1.06 }, "tail": { "h": 0.98, "drop": 0.02, "taper": 0.99 },
+    "cabin": { "wsRake": 44, "rearRake": 50, "cPillar": 0.3, "tumble": 0.16 },
+    "tumble": 0.02, "crown": 0.06, "bumperDark": true,
+    "lights": { "head": "quad", "tail": "rect" }, "extras": { "grille": "wide", "roofLight": true }
+  },
+
+  "trafficPickup": {
+    "label": "車流：小貨卡",
+    "L": 4.7, "W": 1.69, "H": 1.6, "wb": 2.9, "fo": 0.78, "clearance": 0.24, "wheelR": 0.33, "wheelW": 0.21,
+    "nose": { "h": 0.9, "drop": 0.04, "taper": 0.98 }, "cowlH": 1.08, "cowl": 0.42,
+    "beltH": 1.08, "deck": { "h": 1.0, "len": 2.25 }, "tail": { "h": 1.0, "drop": 0.02, "taper": 1.0 },
+    "cabin": { "wsRake": 44, "rearRake": 84, "cPillar": 0.22, "tumble": 0.16, "bPillar": false },
+    "tumble": 0.01, "crown": 0.06, "bumperDark": true,
+    "lights": { "head": "rect", "tail": "tall" }, "extras": { "grille": "wide", "bed": true }
+  },
+
+  "trafficKeiVan": {
+    "label": "車流：輕型廂型車",
+    "L": 3.3, "W": 1.4, "H": 1.86, "wb": 1.9, "fo": 0.72, "clearance": 0.18, "wheelR": 0.26, "wheelW": 0.15,
+    "nose": { "h": 0.92, "drop": 0.03, "taper": 0.98 }, "cowlH": 0.96, "cowl": -0.56,
+    "beltH": 0.98, "deck": { "h": 0.98, "len": 0.08 }, "tail": { "h": 0.97, "drop": 0.02, "taper": 0.99 },
+    "cabin": { "wsRake": 62, "rearRake": 82, "cPillar": 0.3, "tumble": 0.1, "bPillarAt": 0.34 },
+    "tumble": 0.01, "crown": 0.05, "bumperDark": true,
+    "lights": { "head": "round", "tail": "tall" }, "extras": {}
+  },
+
+  "trafficBus": {
+    "label": "車流：大客車",
+    "L": 10.8, "W": 2.48, "H": 3.1, "wb": 5.4, "fo": 2.3, "clearance": 0.36, "wheelR": 0.5, "wheelW": 0.3,
+    "nose": { "h": 1.86, "drop": 0.03, "taper": 0.98 }, "cowlH": 1.9, "cowl": -2.14,
+    "beltH": 1.9, "deck": { "h": 1.9, "len": 0.14 }, "tail": { "h": 1.88, "drop": 0.02, "taper": 0.99 },
+    "cabin": { "wsRake": 80, "rearRake": 86, "cPillar": 0.5, "tumble": 0.04, "bPillarAt": 0.12, "pillars": [0.25, 0.38, 0.51, 0.64, 0.77] },
+    "tumble": 0.01, "crown": 0.08, "bumperDark": true,
+    "lights": { "head": "quad", "tail": "tall", "headY": 0.85, "tailY": 0.95 },
+    "extras": { "mirrors": false }
+  },
+
+  "trafficTanker": {
+    "label": "車流：油罐車",
+    "L": 9.6, "W": 2.46, "H": 2.75, "wb": 5.6, "fo": 1.35, "clearance": 0.42, "wheelR": 0.48, "wheelW": 0.3,
+    "nose": { "h": 1.45, "drop": 0.04, "taper": 0.98 }, "cowlH": 1.5, "cowl": -1.15,
+    "beltH": 1.2, "deck": { "h": 1.1, "len": 7.2 }, "tail": { "h": 1.08, "drop": 0.02, "taper": 1.0 },
+    "cabin": { "wsRake": 72, "rearRake": 86, "cPillar": 0.5, "tumble": 0.08, "bPillar": false },
+    "tumble": 0.01, "crown": 0.1, "bumperDark": true,
+    "lights": { "head": "rect", "tail": "rect" },
+    "extras": { "mirrors": false, "cargo": { "type": "tank", "h": 2.1 } }
+  }
+}

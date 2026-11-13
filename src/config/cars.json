@@ -1,0 +1,40 @@
+{
+  "player": {
+    "model": "coupe",
+    "vMaxKmh": 260,
+    "power": 6.8,
+    "dragCoef": 0.00029,
+    "rollResist": 0.15,
+    "engineBrake": 0.6,
+    "brakeDecel": 9.3,
+    "handbrakeDecel": 3.0,
+    "reverseMaxKmh": 30,
+
+    "steerLow": 2.2,
+    "steerHigh": 0.7,
+    "steerInRate": 4.0,
+    "steerOutRate": 6.0,
+    "alignRate": 3.0,
+
+    "grip": 8.0,
+    "gripDrift": 2.5,
+    "latAccelMax": 18,
+    "driftLatMul": 1.1,
+    "driftYawMul": 1.6,
+    "driftBrakeMul": 0.4,
+    "slideScrub": 0.3,
+    "slideScrubDrift": 0.1,
+
+    "wallLossGraze": 0.03,
+    "wallLossHeadOn": 0.35,
+    "wallScrapeDecel": 2.0,
+    "wallBounce": 0.15,
+
+    "slipstreamRange": 30,
+    "slipstreamWidth": 1.5,
+    "slipstreamDragCut": 0.35,
+
+    "halfWidth": 0.9,
+    "halfLength": 2.2
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.claude/settings.local.json
+*.log
+
+# 錄音音效剪自 Sonniss GameAudioGDC Bundle：授權允許放進遊戲成品，但不允許把音檔本身公開散布，
+# 所以不進公開 repo（來源見 public/audio/sfx/CREDITS.md）。缺檔時遊戲照常執行，只是沒有這些音效。
+public/audio/sfx/*.ogg
