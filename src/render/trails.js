@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // 尾燈光軌：每顆尾燈拖一條留在世界座標裡的光帶，愈舊愈淡。
 // 全部光帶合成一個幾何、一次 draw call；頂點座標以 anchor（玩家位置）為基準，開得再遠也不抖。
 const SEG = 22;          // 每條光帶的節點數
-const LIFE = 0.6;        // 光帶留存的秒數（深夜賽車的味道：拖長一點）
+const LIFE = 0.42;       // 光帶留存的秒數（深夜賽車的味道：拖長一點）
 const STEP = LIFE / (SEG - 2);
 
 export function createTrails(scene, max = 84) {
