@@ -1,4 +1,5 @@
 {
+  "wallGap": 24,
   "maxCars": 40,
   "densityPerKm": 16,
   "spawnAheadMin": 900,

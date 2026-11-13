@@ -8,8 +8,8 @@
   },
   "junction": {
     "firstForkAt": 1300,
-    "forkAheadMin": 1250,
-    "forkAheadMax": 1500,
+    "forkAheadMin": 950,
+    "forkAheadMax": 1000,
     "altKeepAfterFork": 220,
     "altLength": 1600
   },

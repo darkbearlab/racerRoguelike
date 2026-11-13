@@ -48,6 +48,36 @@ export function createTraffic(road, rng, cfg) {
     return true;
   }
 
+  // ── 不准排成一堵牆：任何位置都不能三個車道同時有車並排（玩家一定要有縫可以鑽）
+  // 一台車「佔」它所在的車道；正在變換車道（含已經打燈）時，來源和目標兩條都算
+  const covers = (o, L) => o.lane === L || ((o.changeT > 0 || o.blinkTime > 0) && (o.toLane === L || o.fromLane === L));
+  const _wall = { rear: null, minV: 0, list: [] };
+  /**
+   * 位置 s 的一台車（長 len，佔 covA、covB 兩條車道，covB 沒有就給 −1）會不會和別的車湊成一堵牆：
+   * 其餘每條車道在前後 wallGap 公尺內都有車。會的話回傳那些車裡最後面的那一台與最慢的車速，否則回傳 null。
+   */
+  function wall(s, len, onAlt, self, covA, covB) {
+    const W = cfg.wallGap ?? 24;
+    let rear = null, minV = Infinity;
+    _wall.list.length = 0;
+    for (let L = 0; L < road.lanes; L++) {
+      if (L === covA || L === covB) continue;
+      let best = null, bestD = Infinity;
+      for (const o of cars) {
+        if (!o.active || o === self || o.onAlt !== onAlt || !covers(o, L)) continue;   // 正在併入的車算它要去的那條車道
+        const ds = Math.abs(o.s - s);
+        if (ds < W + (o.len + len) / 2 && ds < bestD) { best = o; bestD = ds; }
+      }
+      if (!best) return null;
+      if (!rear || best.s < rear.s) rear = best;
+      _wall.list.push(best);
+      if (best.v < minV) minV = best.v;
+    }
+    _wall.rear = rear; _wall.minV = minV;
+    return _wall;
+  }
+  api.wall = wall;
+
   function spawn(s, lane, onAlt = false) {
     const c = cars.find((k) => !k.active);
     if (!c) return null;
@@ -86,7 +116,7 @@ export function createTraffic(road, rng, cfg) {
     for (let k = 0; k < n * 6 && placed < n; k++) {
       const lane = rng.int(0, road.lanes - 1);
       const s = rng.range(s0, s1);
-      if (!spawnable(road, s) || !laneFree(lane, s, -16, 16, null)) continue;
+      if (!spawnable(road, s) || !laneFree(lane, s, -16, 16, null) || wall(s, 5, false, null, lane, -1)) continue;
       const c = spawn(s, lane);
       if (!c) break;
       if (opts.kmhMin) { c.cruise = rng.range(opts.kmhMin, opts.kmhMax) / 3.6; c.v = c.cruise; c.timer = 999; }
@@ -101,7 +131,7 @@ export function createTraffic(road, rng, cfg) {
     for (let k = 0; k < want * 3; k++) {
       const lane = rng.int(0, road.lanes - 1);
       const s = player.s + rng.range(120, Math.min(cfg.spawnAheadMax, road.sMax - player.s - 100));
-      if (spawnable(road, s) && laneFree(lane, s, -cfg.minSpawnGap, cfg.minSpawnGap, null)) spawn(s, lane);
+      if (spawnable(road, s) && laneFree(lane, s, -cfg.minSpawnGap, cfg.minSpawnGap, null) && !wall(s, 5, false, null, lane, -1)) spawn(s, lane);
       if (cars.filter((c) => c.active).length >= want) break;
     }
   };
@@ -152,7 +182,7 @@ export function createTraffic(road, rng, cfg) {
         : player.s + rng.range(cfg.spawnAheadMin, cfg.spawnAheadMax);
       const onAlt = !!(api.alt && fork && s > fork.s && rng.next() < 0.5);
       const rd = onAlt ? api.alt : road;
-      if (spawnable(rd, s) && laneFree(lane, s, -cfg.minSpawnGap, cfg.minSpawnGap, null, onAlt)) {
+      if (spawnable(rd, s) && laneFree(lane, s, -cfg.minSpawnGap, cfg.minSpawnGap, null, onAlt) && !wall(s, 5, onAlt, null, lane, -1)) {
         if (spawn(s, lane, onAlt)) active++;
       }
     }
@@ -173,6 +203,21 @@ export function createTraffic(road, rng, cfg) {
         c.v = cfg.mergeStartKmh / 3.6;
         active++;
       }
+    }
+
+    // ── 快要排成牆的那幾台：最後面的一台放慢、退出來（其他照常開，牆就散了）
+    for (const c of cars) c.avoid = Infinity;
+    for (const c of cars) {
+      if (!c.active || c.lane < 0) continue;
+      const w = wall(c.s, c.len, c.onAlt, c, c.lane, c.changeT > 0 || c.blinkTime > 0 ? c.toLane : -1);
+      if (!w) continue;
+      const rear = c.s <= w.rear.s ? c : w.rear;
+      // 目標：比「另外幾台」裡最慢的再慢一點點，像跟車一樣待在後面。
+      // 基準不能算進自己的車速（否則每一步都比自己再慢一點，會一路降到停）；也不降太多，免得變成後面來車的路障
+      let v = rear === c ? Infinity : c.v;
+      for (const o of w.list) if (o !== rear && o.v < v) v = o.v;
+      v = Math.max(rear.cruise * 0.45, v - 2);
+      if (v < rear.avoid) rear.avoid = v;
     }
 
     // ── 行為
@@ -203,6 +248,7 @@ export function createTraffic(road, rng, cfg) {
       let desired = c.cruise;
       if (c.merging && c.yield) desired = Math.min(desired, c.s > c.mergeEnd - 30 ? 4 : 12);
       if (gap < 8 + c.v * 1.3) desired = Math.min(desired, gap < 6 ? Math.max(0, lead - 3) : lead);
+      if (c.avoid < desired) desired = c.avoid;
       const dv = desired - c.v;
       c.braking = dv < -0.5;
       c.v += clamp(dv, -6 * dt, 1.5 * dt);
@@ -236,7 +282,7 @@ export function createTraffic(road, rng, cfg) {
             const toD = rd.laneCenterAt(c.toLane, c.s);
             let beside = false;
             for (const p of racers) if (!!p.onAlt === c.onAlt && Math.abs(p.d - toD) < 2 && Math.abs(p.s - c.s) < 9) beside = true;
-            const free = !beside && laneFree(c.toLane, c.s, -14, 22, c, c.onAlt);
+            const free = !beside && laneFree(c.toLane, c.s, -14, 22, c, c.onAlt) && (c.merging || (!wall(c.s, c.len, c.onAlt, c, c.lane, c.toLane) && !wall(c.s, c.len, c.onAlt, c, c.toLane, -1)));
             if (free && (c.merging || !nearJct)) {
               c.changeT = cfg.laneChangeTime; c.fromLane = c.lane; c.toD = toD; c.yield = false;
               api.laneChanges++;
@@ -255,7 +301,7 @@ export function createTraffic(road, rng, cfg) {
             c.timer = rng.range(cfg.laneChangeEveryMin, cfg.laneChangeEveryMax);
             const to = c.lane + (rng.next() < 0.5 ? -1 : 1);
             const inMerge = rd.widthLeft(c.s + 60) > rd.halfWidth + 0.1 || rd.widthLeft(c.s) > rd.halfWidth + 0.1;
-            if (!nearJct && to >= 0 && to < rd.lanes && !(inMerge && to === 0) && laneFree(to, c.s, -25, 45, c, c.onAlt)) beginChange(c, to);
+            if (!nearJct && to >= 0 && to < rd.lanes && !(inMerge && to === 0) && laneFree(to, c.s, -25, 45, c, c.onAlt) && !wall(c.s, c.len, c.onAlt, c, c.lane, to) && !wall(c.s, c.len, c.onAlt, c, to, -1)) beginChange(c, to);
           }
         }
       }

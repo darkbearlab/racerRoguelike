@@ -376,6 +376,8 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
         }
       } else if (duel.phase === 'idle' || duel.phase === 'result') {
         S.leaveT += dt;
+        // 勝負一分出來這個節點就結束，下一個交流道馬上開始安排（不用等勝利字樣跑完）
+        if (S.applied) S.endNode();
         const rel = rival.st.s - state.s;
         if (duel.phase === 'idle') {
           S.endNode(); // 勝負已分，這個節點結束；對手自己慢慢離開
@@ -413,7 +415,7 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
           S.alt = null;
           emit('altCleared', {});
         }
-        if (flow.wantJct && !S.alt) {
+        if (flow.wantJct && !S.alt && !S.pendingNight) {
           S.placeJunction(flowRng.range(runCfg.junction.forkAheadMin, runCfg.junction.forkAheadMax));
         }
         // ── 時鐘：永遠在走；車流越接近天亮越密

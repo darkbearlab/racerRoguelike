@@ -395,9 +395,13 @@ section('完整一晚（自動駕駛跑到天亮）');
   ev.on('pa', () => log.pa++);
   ev.on('forkSwap', () => log.swaps++);
   ev.on('altCleared', () => log.cleared++);
+  // 對決結束 → 下一個交流道出現在 HUD（650 m 內）要多久；車流有沒有三線並排成一堵牆
+  let duelEndT = -1, wallMinGap = Infinity, wallSamples = 0; const jctWait = [];
+  ev.on('duelEnd', () => { duelEndT = t; });
+  let t = 0;
   const S = createSession({ seed: 20261112, carCfg: cfg, zone, trafficCfg: tcfg, duelCfg: dcfg, rivals: allRivals, runCfg: rcfg, events: ev });
   const st = S.state, inp = {}, mem = createAiMemory();
-  let t = 0, bad = false, maxOver = 0, maxOverR = 0, slow = 0, rivalOnAltAfterChoice = 0, overlaps = 0, n = 0;
+  let bad = false, maxOver = 0, maxOverR = 0, slow = 0, rivalOnAltAfterChoice = 0, overlaps = 0, n = 0;
   let wantSide = 1;
   while (!S.over && t < 1500) {
     // 交流道前靠向要選的那一側（左右輪流，確保兩種都測到）
@@ -416,6 +420,22 @@ section('完整一晚（自動駕駛跑到天亮）');
       if (S.flow.chosen && S.rival.onAlt) rivalOnAltAfterChoice++;
       if (!S.rival.onAlt) maxOverR = Math.max(maxOverR, over(S.rival.st, S.road));
     }
+    if (duelEndT >= 0 && !S.flow.chosen && S.flow.forkS - st.s < 650) { jctWait.push(t - duelEndT); duelEndT = -1; }
+    if (n % 6 === 0) {
+      // 每台車：另外兩條車道各自最近的車，保險桿之間的縱向空隙取大的那個。小於 3 m 就等於三線並排
+      const on = S.traffic.cars.filter((c) => c.active && !c.onAlt && c.lane >= 0);
+      for (const c of on) {
+        let g2 = 0, full = true;
+        for (let L = 0; L < S.road.lanes; L++) {
+          if (L === c.lane) continue;
+          let g = Infinity;
+          for (const o of on) if (o !== c && o.lane === L) g = Math.min(g, Math.abs(o.s - c.s) - (o.len + c.len) / 2);
+          if (g === Infinity) full = false;
+          g2 = Math.max(g2, g);
+        }
+        if (full) { wallMinGap = Math.min(wallMinGap, g2); if (g2 < 3) wallSamples++; }
+      }
+    }
     if (n % 6 === 0) {
       const cs = S.traffic.cars;
       for (let a = 0; a < cs.length; a++) {
@@ -432,6 +452,9 @@ section('完整一晚（自動駕駛跑到天亮）');
   // 快天亮時才輸的那一場，罰時會被剩餘時間截短，所以實際可以比算出來的多撐最多一次罰時
   const slack = S.run.losses > 0 ? dcfg.loseMinutes * 60 / rcfg.clock.gameSecondsPerRealSecond : 0;
   check('時鐘速度與懲罰正確', t > expect - 1.5 && t < expect + slack + 1.5);
+  check('車流不會三個車道同時並排堵住', wallSamples === 0, `整晚最窄的一次：錯開 ${wallMinGap.toFixed(1)} m`);
+  const waitAvg = jctWait.reduce((a, b) => a + b, 0) / Math.max(1, jctWait.length);
+  check('對決結束後很快就出現下一個交流道', jctWait.length >= 3 && waitAvg < 20, `${jctWait.length} 次，平均 ${waitAvg.toFixed(1)} 秒，最久 ${Math.max(...jctWait).toFixed(1)} 秒`);
   check('數值正常、不穿牆', !bad && maxOver < 0.02 && maxOverR < 0.02, `玩家超出 ${Math.max(0, maxOver).toFixed(3)} m，對手超出 ${Math.max(0, maxOverR).toFixed(3)} m`);
   check('不卡住', slow < 15, `低於 30 km/h 共 ${slow.toFixed(1)} 秒`);
   check('交流道持續出現、左右都選得到', log.placed >= 5 && log.chosen.includes(-1) && log.chosen.includes(1),
