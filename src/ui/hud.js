@@ -102,7 +102,8 @@ export function createHud(debugOn) {
     run(run, nodeLabel, info) {
       if (info) {
         set('nightLine', $('nightLine'), 'text', `第 ${info.night} 晚　${info.zoneName}`);
-        set('defeats', defeats, 'text', run.nightDefeats >= info.need ? `${run.nightDefeats} / ${info.need}　Boss 出現` : `${run.nightDefeats} / ${info.need}`);
+        if (info.rush) set('defeats', defeats, 'text', `Boss ${run.bossWins} / ${info.total}`);
+        else set('defeats', defeats, 'text', run.nightDefeats >= info.need ? `${run.nightDefeats} / ${info.need}　Boss 出現` : `${run.nightDefeats} / ${info.need}`);
       } else set('defeats', defeats, 'text', String(run.defeats));
       set('bounty', bounty, 'text', String(run.bounty));
       set('runNote', runNote, 'text', nodeLabel || '');

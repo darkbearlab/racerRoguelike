@@ -13,7 +13,7 @@ export function createTraffic(road, rng, cfg) {
   for (let i = 0; i < cfg.maxCars; i++) {
     cars.push({
       id: i, active: false, onAlt: false, type: 'sedan', len: 4.5, wid: 1.8, height: 1.4,
-      s: 0, d: 0, v: 0, cruise: 0, lane: 0, toLane: 0, fromLane: 0, toD: 0,
+      s: 0, d: 0, ps: 0, pd: 0, v: 0, cruise: 0, lane: 0, toLane: 0, fromLane: 0, toD: 0,
       changeT: 0,      // > 0：正在變換車道（剩餘秒數）
       blink: 0,        // −1 左、+1 右
       blinkTime: 0,    // 打燈後還要等多久才開始切
@@ -86,6 +86,7 @@ export function createTraffic(road, rng, cfg) {
     c.active = true; c.onAlt = onAlt; c.type = type; c.len = t.len; c.wid = t.wid; c.height = t.height;
     c.s = s; c.lane = lane; c.toLane = lane; c.fromLane = lane;
     c.d = roadOf(c).laneCenterAt(lane, s); c.toD = c.d;
+    c.ps = c.s; c.pd = c.d;
     c.cruise = rng.range(t.kmhMin, t.kmhMax) / 3.6;
     c.v = c.cruise;
     c.changeT = 0; c.blink = 0; c.blinkTime = 0; c.yaw = 0; c.braking = false;
@@ -143,6 +144,9 @@ export function createTraffic(road, rng, cfg) {
       if (cars.filter((c) => c.active).length >= want) break;
     }
   };
+
+  /** 每個物理步開頭呼叫：記下上一步的位置，畫面在兩步之間內插（和玩家同一套，否則靠近時會看到車子前後抖） */
+  api.snapshot = () => { for (const c of cars) { c.ps = c.s; c.pd = c.d; } };
 
   /** 玩家選了另一條分支：分歧點之後的車換邊 */
   api.swapBranches = (forkS) => {

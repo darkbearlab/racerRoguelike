@@ -33,6 +33,7 @@ import { createGameAudio } from './audio/gameAudio.js';
 const params = new URLSearchParams(location.search);
 const DEBUG = params.get('debug') === '1';
 const AUTOPILOT = params.get('autopilot') === '1';
+const BOSS_RUSH = params.get('mode') === 'boss';   // Boss 連戰：選完車隨機抽幾個成長，三位 Boss 連續登場
 const seed = Number(params.get('seed')) || 20261112;
 
 // 設定物件原地更新，改 JSON 存檔後由 Vite 熱更新直接生效
@@ -56,7 +57,7 @@ const hud = createHud(DEBUG);
 // 事件要在建立 session 之前掛好：開局就會插入第一個交流道
 const boot = [];
 events.on('jctPlaced', (e) => boot.push(e));
-const session = createSession({ seed, carCfg, rivalBase: carsJson.rivalBase, zone, zones: zonesJson, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events });
+const session = createSession({ seed, carCfg, rivalBase: carsJson.rivalBase, zone, zones: zonesJson, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events, bossRush: BOSS_RUSH });
 const { road, traffic, state, rival, duel, clock, flow, playerCfg, upgrades, menus } = session;
 const choiceUi = createChoiceUi();
 const audio = createGameAudio({ events, state, traffic, rival });
@@ -211,6 +212,7 @@ events.on('duelApplied', (e) => {
   if (e.def.tier === 'boss') setTimeout(() => hud.bossCard(e.def, e.win ? e.def.radio?.lose : e.def.radio?.win, 3.5), 2000);
 });
 events.on('nightStart', (e) => hud.night(e.night, e.zone.name));
+events.on('rushBuffs', (e) => setTimeout(() => hud.toast(`抽到的強化：${e.list.map((d) => d.name).join('、')}`, 6), 2400));
 events.on('shortcutDone', (e) => hud.toast(`↪ 捷徑完成　退回 ${e.minutes} 分鐘`, 2.4));
 events.on('eventStart', (e) => hud.toast(
   e.kind === 'jam' ? '❓ 前方塞車　越快穿過賞金越多，撞到會扣'
@@ -353,9 +355,27 @@ function confirmPick() {
   applyStarter();
   session.recompute();
   session.resetStart();
+  session.drawBuffs();
   startRun();
 }
-btnStart.addEventListener('click', openPick);
+// 兩種模式的賽道一開始就不一樣（連戰沒有交流道），所以換模式要重新載入；載入後直接進選車
+const btnBoss = document.getElementById('btnBoss');
+const pickMode = (boss) => {
+  if (boss === BOSS_RUSH) { openPick(); return; }
+  const u = new URL(location.href);
+  if (boss) u.searchParams.set('mode', 'boss'); else u.searchParams.delete('mode');
+  u.searchParams.set('pick', '1');
+  location.href = u.href;
+};
+btnStart.classList.toggle('sel', !BOSS_RUSH); btnBoss.classList.toggle('sel', BOSS_RUSH);
+if (BOSS_RUSH) document.querySelector('#title h2').textContent = 'BOSS RUSH';
+btnStart.addEventListener('click', () => pickMode(false));
+btnBoss.addEventListener('click', () => pickMode(true));
+if (AUTOPILOT) session.drawBuffs();
+if (params.get('pick') === '1' && !AUTOPILOT) {
+  const u = new URL(location.href); u.searchParams.delete('pick'); history.replaceState(null, '', u.href);
+  setTimeout(openPick, 0);
+}
 btnSettings.addEventListener('click', () => settingsEl.classList.toggle('on'));
 addEventListener('keydown', (e) => {
   if (started) return;
@@ -367,6 +387,7 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); openPick(); }
+  else if (e.code === 'KeyB') pickMode(true);
   else if (e.code === 'Tab') { e.preventDefault(); settingsEl.classList.toggle('on'); }
 });
 hud.title(!started);
@@ -457,7 +478,7 @@ function render(alpha, dt) {
   sky.position.copy(rig.camera.position);
 
   streamer.update(state.s, rig.camera);
-  trafficMesh.update(pose.p, paused ? 0 : dt);
+  trafficMesh.update(pose.p, paused ? 0 : dt, a);
   trails.update(pose.p, paused ? 0 : dt);
 
   // 駕駛艙：儀表與後視鏡
@@ -536,7 +557,7 @@ function render(alpha, dt) {
     if (ev.kind === 'jam') nodeLabel += ev.entered ? `　${ev.t.toFixed(0)} 秒　碰撞 ${ev.hits}　還有 ${Math.max(0, Math.round((ev.s1 - state.s) / 10) * 10)} m` : `　前方 ${Math.max(0, Math.round((ev.s0 - state.s) / 10) * 10)} m`;
     else if (ev.kind === 'delivery' && ev.phase === 'chase') nodeLabel += `　${ev.chaseT.toFixed(0)} 秒　剩 ${Math.max(0, ev.limit - ev.chaseT).toFixed(0)} 秒`;
   }
-  hud.run(session.run, nodeLabel, session.nights ? { night: session.run.night, zoneName: session.zoneName, need: runCfg.boss.afterDefeats } : null);
+  hud.run(session.run, nodeLabel, session.nights ? { night: session.run.night, zoneName: session.zoneName, need: runCfg.boss.afterDefeats, rush: session.bossRush, total: session.nights.length } : null);
   hud.clock(clock);
   choiceUi.update(menus, session.run, upgrades);
   setDaylight(clock.progress);

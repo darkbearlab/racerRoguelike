@@ -83,7 +83,7 @@ export function createTrafficMesh(scene, road, traffic, cfg, models) {
     /** 車流的車漆只加環境倒影，不開透明漆層（40 台車，省一點） */
     setGloss(env) { bodyMat.envMap = env; bodyMat.envMapIntensity = env ? 0.8 : 0; bodyMat.roughness = env ? 0.38 : 0.5; bodyMat.metalness = env ? 0.5 : 0.3; bodyMat.needsUpdate = true; },
     /** anchor：THREE.Vector3（玩家世界座標） */
-    update(anchor, dt) {
+    update(anchor, dt, alpha = 1) {
       time += dt;
       const blinkOn = (time * 1.6) % 1 < 0.55;
       group.position.copy(anchor);
@@ -97,13 +97,16 @@ export function createTrafficMesh(scene, road, traffic, cfg, models) {
           hp.setXYZ(i, 0, -9999, 0);
           continue;
         }
-        (c.onAlt && traffic.alt ? traffic.alt : road).frame(c.s, fr);
+        // 和玩家一樣在兩個物理步之間內插；剛生成或被搬走的車（差距過大）直接用新位置
+        const far = Math.abs(c.s - c.ps) > 5;
+        const cS = far ? c.s : c.ps + (c.s - c.ps) * alpha, cD = far ? c.d : c.pd + (c.d - c.pd) * alpha;
+        (c.onAlt && traffic.alt ? traffic.alt : road).frame(cS, fr);
         R.fromArray(fr.r); T.fromArray(fr.t); U.fromArray(fr.u);
         const cs = Math.cos(c.yaw), sn = Math.sin(c.yaw);
         F.copy(T).multiplyScalar(cs).addScaledVector(R, -sn);
         L.copy(R).multiplyScalar(-cs).addScaledVector(T, -sn);
         base.makeBasis(L, U, F);
-        base.setPosition(fr.p[0] + R.x * c.d - anchor.x, fr.p[1] + R.y * c.d - anchor.y, fr.p[2] + R.z * c.d - anchor.z);
+        base.setPosition(fr.p[0] + R.x * cD - anchor.x, fr.p[1] + R.y * cD - anchor.y, fr.p[2] + R.z * cD - anchor.z);
 
         const body = bodies[c.type];
         body.setMatrixAt(i, base);

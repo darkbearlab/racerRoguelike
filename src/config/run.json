@@ -1,4 +1,4 @@
-{
+﻿{
   "clock": {
     "startMinute": 0,
     "dawnMinute": 300,
@@ -23,6 +23,7 @@
     "spawnBehind": 150,
     "spawnAfterFork": 320
   },
+  "bossRush": { "buffs": 5, "buffTier": "boss", "firstDelay": 8, "nextDelay": 5 },
   "nodes": {
     "weights": { "rival": 5, "elite": 2, "pa": 2 },
     "rivalSpawnAfterFork": 420,

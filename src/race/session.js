@@ -27,7 +27,7 @@ import { drive, createAiMemory } from '../vehicle/ai.js';
 export const ROAD_AHEAD = 2800, ROAD_BEHIND = 560;
 const NONE = [];
 
-export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events, mode = 'run' }) {
+export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events, mode = 'run', bossRush = false }) {
   const ev = events || createEvents();
   const emit = (name, payload) => ev.emit(name, payload);
   // 道路生成、車流、對手、節點各用獨立的亂數流，互不影響，方便重現
@@ -96,6 +96,8 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
     zoneName: nights ? zoneOf(1).name : zone.name,
     zoneDensity: nights ? (zoneOf(1).traffic?.densityMul ?? 1) : 1,
     pendingNight: false, // 擊敗 Boss 後，等選完成長就進入下一晚
+    bossRush: !!bossRush && mode === 'run',   // Boss 連戰：沒有交流道與一般節點，三位 Boss 一個接一個登場
+    rushT: runCfg?.bossRush?.firstDelay ?? 5,  // 距離下一位 Boss 登場還有幾秒
     realTime: 0,         // 這一局的現實秒數
     slip: false,
     rivalIndex: 0,
@@ -194,6 +196,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       if (S.over) return;
       const prev = S.prev;
       prev.s = state.s; prev.d = state.d; prev.psi = state.psi;
+      traffic.snapshot();
 
       // ── 三選一開著：世界完全停住，沒有時間限制，選完才繼續
       if (S.menus && S.menus.current && S.menus.current.kind === 'choice') {
@@ -345,6 +348,12 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         if (mode === 'loop') {
           S.respawnT -= dt;
           if (S.respawnT <= 0) S.spawnRival(rivals[S.rivalIndex % rivals.length], state.s + duelCfg.spawnAhead + Math.max(0, state.vf) * 1.5);
+        } else if (S.bossRush) {
+          // Boss 連戰：路上沒有別的事，隔幾秒 Boss 就從後方登場；輸了也會再來一次，直到天亮
+          if (!S.pendingNight && !S.pendingChoice && !menu) {
+            S.rushT -= dt;
+            if (S.rushT <= 0 && S.spawnBoss(rivals.find((r) => r.id === nights[S.run.night - 1].boss))) S.rushT = runCfg.bossRush?.nextDelay ?? 5;
+          }
         } else if (flow.rivalPending === 'boss') {
           // Boss：過了分歧的變寬段之後，從後方登場
           if (state.s > flow.nodeStartS + runCfg.boss.spawnAfterFork) {
@@ -426,7 +435,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
           S.alt = null;
           emit('altCleared', {});
         }
-        if (flow.wantJct && !S.alt && !S.pendingNight) {
+        if (flow.wantJct && !S.alt && !S.pendingNight && !S.bossRush) {
           S.placeJunction(flowRng.range(runCfg.junction.forkAheadMin, runCfg.junction.forkAheadMax));
         }
         // ── 時鐘：永遠在走；車流越接近天亮越密
@@ -479,6 +488,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       S.zoneDensity = z.traffic?.densityMul ?? 1;
       S.zoneName = z.name;
       clock.reset();
+      if (S.bossRush) S.rushT = runCfg.bossRush?.nextDelay ?? 5;
       emit('nightStart', { night: S.run.night, zone: z });
     },
 
@@ -610,6 +620,15 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   S.recompute = () => { duelBase.threshold = duelCfg.threshold; if (upgrades) upgrades.recompute(); else Object.assign(playerCfg, carCfg); };
   if (mode !== 'run') traffic.density = 1;
   if (nights) traffic.typeWeights = zoneOf(1).traffic?.typeWeights || null;
-  if (mode === 'run') S.placeJunction(runCfg.junction.firstForkAt);
+  /** Boss 連戰開局：隨機抽幾個成長直接裝上（選完車後呼叫一次）。回傳抽到的清單 */
+  S.drawBuffs = () => {
+    if (!upgrades || !S.bossRush) return [];
+    const br = runCfg.bossRush || {};
+    const list = upgrades.offer(menuRng, br.buffTier || 'boss', br.buffs ?? 5);
+    for (const d of list) upgrades.add(d.id);
+    emit('rushBuffs', { list });
+    return list;
+  };
+  if (mode === 'run' && !S.bossRush) S.placeJunction(runCfg.junction.firstForkAt);
   return S;
 }

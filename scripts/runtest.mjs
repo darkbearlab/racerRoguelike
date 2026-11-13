@@ -23,11 +23,11 @@ const check = (name, ok, info = '') => {
 const section = (t) => console.log(`\n── ${t}`);
 const over = (st, road) => Math.max(st.d - (road.widthRight(st.s) - cfg.halfWidth), -st.d - (road.widthLeft(st.s) - cfg.halfWidth));
 
-function make(seed, runOverride) {
+function make(seed, runOverride, bossRush = false) {
   const ev = createEvents();
   const S = createSession({
     seed, carCfg: { ...cfg }, zone: zones.default, zones, trafficCfg: tcfg, duelCfg: structuredClone(dcfg), rivals,
-    runCfg: { ...structuredClone(rcfg), ...(runOverride || {}) }, upgradeCfg: structuredClone(ucfg), events: ev,
+    runCfg: { ...structuredClone(rcfg), ...(runOverride || {}) }, upgradeCfg: structuredClone(ucfg), events: ev, bossRush,
   });
   return { S, ev };
 }
@@ -37,8 +37,9 @@ function make(seed, runOverride) {
  *   forceWin(S)   回傳 true 時直接判玩家獲勝（測流程用，不靠駕駛實力）
  *   prefer(opts)  回傳要走的那一側（−1 / +1），不給就優先選還沒走過的節點類型
  */
-function play(seed, { forceWin, forceLose, maxSeconds = 3600, runOverride, duelOnly } = {}) {
-  const { S, ev } = make(seed, runOverride);
+function play(seed, { forceWin, forceLose, maxSeconds = 3600, runOverride, duelOnly, bossRush } = {}) {
+  const { S, ev } = make(seed, runOverride, bossRush);
+  const buffs = S.drawBuffs();
   const st = S.state, inp = {}, mem = createAiMemory();
   const log = {
     nodes: {}, events: {}, bossIntro: [], nights: [{ night: 1, zone: S.zoneName, at: 0, defeats: 0 }], shortcut: 0, bossOffered: [], duels: [],
@@ -84,7 +85,24 @@ function play(seed, { forceWin, forceLose, maxSeconds = 3600, runOverride, duelO
     log.maxOver = Math.max(log.maxOver, over(st, S.road));
     if (t > 10 && st.vf < 30 / 3.6) log.slow += DT;
   }
+  log.buffs = buffs;
   return { S, log, t };
+}
+
+section('Boss 連戰模式');
+{
+  const { S, log, t } = play(4242, { forceWin: () => true, bossRush: true, maxSeconds: 1800 });
+  check('開局隨機抽到成長並裝上', log.buffs.length === rcfg.bossRush.buffs && new Set(log.buffs.map((d) => d.id)).size === log.buffs.length, log.buffs.map((d) => d.name).join('、'));
+  check('沒有交流道與一般節點', S.run.forks === 0 && Object.keys(log.nodes).length === 0 && log.duels.every((d) => d.tier === 'boss'));
+  check('三位 Boss 依序登場（都有登場演出）', log.bossIntro.length === 3 && new Set(log.bossIntro).size === 3, log.bossIntro.join(' → '));
+  check('三連勝就通關', S.over?.reason === 'victory' && S.run.bossWins === 3, `現實 ${(t / 60).toFixed(1)} 分鐘，Boss 之間各選一次成長（共 ${log.choices} 次）`);
+  const L = play(4243, { forceLose: (s) => s.run.losses < 2, forceWin: (s) => s.run.losses >= 2, bossRush: true, maxSeconds: 1800 });
+  check('輸了同一位 Boss 會再來挑戰', L.log.bossIntro.length === 5 && L.log.bossIntro[0] === L.log.bossIntro[2] && L.S.over?.reason === 'victory', L.log.bossIntro.join(' → '));
+  for (const seed of [11, 12, 13]) {
+    const R = play(seed, { bossRush: true, maxSeconds: 3600 });
+    const d = R.log.duels;
+    console.log(`      自動駕駛實打 seed ${seed}：${R.S.over?.reason === 'victory' ? '通關' : `第 ${R.S.run.night} 位 Boss 前天亮`}，現實 ${(R.t / 60).toFixed(1)} 分鐘，${d.filter((x) => x.win).length} 勝 ${d.filter((x) => !x.win).length} 敗`);
+  }
 }
 
 section('完整一局：三晚打到通關（對決由測試直接判勝，驗證流程）');
