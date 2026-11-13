@@ -1,12 +1,13 @@
 {
   "player": {
     "model": "coupe",
-    "vMaxKmh": 260,
-    "power": 6.8,
+    "startKmh": 100,
+    "vMaxKmh": 190,
+    "power": 4.2,
     "dragCoef": 0.00029,
     "rollResist": 0.15,
     "engineBrake": 0.6,
-    "brakeDecel": 9.3,
+    "brakeDecel": 8.5,
     "handbrakeDecel": 3.0,
     "reverseMaxKmh": 30,
 
@@ -18,7 +19,7 @@
 
     "grip": 8.0,
     "gripDrift": 2.5,
-    "latAccelMax": 18,
+    "latAccelMax": 16,
     "driftLatMul": 1.1,
     "driftYawMul": 1.6,
     "driftBrakeMul": 0.4,
@@ -36,5 +37,26 @@
 
     "halfWidth": 0.9,
     "halfLength": 2.2
-  }
+  },
+  "starters": [
+    {
+      "id": "light", "name": "輕量掀背", "model": "hatch", "color": "#e8c21c",
+      "tag": "彎道型", "desc": "車身輕，加速與過彎最好，煞車也最短；極速最低，長直線會被拉開。",
+      "stats": { "極速": 2, "加速": 5, "過彎": 5, "煞車": 5 },
+      "car": { "vMaxKmh": 178, "power": 4.6, "latAccelMax": 18, "grip": 9.0, "steerLow": 2.4, "steerHigh": 0.8, "brakeDecel": 9.4 }
+    },
+    {
+      "id": "balanced", "name": "標準雙門", "model": "coupe", "color": "#1d4fd0",
+      "tag": "均衡型", "desc": "沒有弱點也沒有強項，之後想往哪個方向強化都可以。",
+      "stats": { "極速": 3, "加速": 3, "過彎": 3, "煞車": 3 },
+      "car": {}
+    },
+    {
+      "id": "heavy", "name": "大排氣量轎跑", "model": "muscle", "color": "#c85a12",
+      "tag": "直線型", "desc": "極速最高，吸尾流效果更好；車重，過彎和煞車都要提早。",
+      "stats": { "極速": 5, "加速": 2, "過彎": 2, "煞車": 2 },
+      "car": { "vMaxKmh": 208, "power": 4.0, "latAccelMax": 14.5, "grip": 7.2, "steerLow": 2.0, "steerHigh": 0.62, "brakeDecel": 7.8, "slipstreamDragCut": 0.42 }
+    }
+  ],
+  "rivalBase": { "latAccelMax": 16, "grip": 8.0, "brakeDecel": 8.5, "steerLow": 2.2, "steerHigh": 0.7, "slipstreamDragCut": 0.35 }
 }

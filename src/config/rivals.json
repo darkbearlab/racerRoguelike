@@ -2,88 +2,88 @@
   "list": [
     {
       "id": "greywolf", "model": "hatch", "name": "灰狼", "tier": "normal", "color": "#8d9299",
-      "topSpeedKmh": 236, "power": 6.1, "cruiseKmh": 112,
+      "topSpeedKmh": 173, "power": 3.78, "cruiseKmh": 112,
       "cornerSkill": 0.5, "aggression": 0.35, "block": 0.15, "mistake": 0.4
     },
     {
       "id": "nightjar", "model": "sedan", "name": "夜鶯", "tier": "normal", "color": "#d8b23a",
-      "topSpeedKmh": 250, "power": 6.6, "cruiseKmh": 118,
+      "topSpeedKmh": 184, "power": 4.09, "cruiseKmh": 118,
       "cornerSkill": 0.72, "aggression": 0.6, "block": 0.4, "mistake": 0.22
     },
     {
       "id": "scorpion", "model": "wedge", "name": "赤蠍", "tier": "normal", "color": "#c2281e",
-      "topSpeedKmh": 262, "power": 7.0, "cruiseKmh": 124,
+      "topSpeedKmh": 193, "power": 4.34, "cruiseKmh": 124,
       "cornerSkill": 0.88, "aggression": 0.85, "block": 0.6, "mistake": 0.1
     },
     {
       "id": "hummingbird", "model": "kei", "name": "蜂鳥", "tier": "normal", "color": "#e8c21c",
-      "topSpeedKmh": 230, "power": 6.3, "cruiseKmh": 110,
+      "topSpeedKmh": 169, "power": 3.91, "cruiseKmh": 110,
       "cornerSkill": 0.8, "aggression": 0.5, "block": 0.2, "mistake": 0.3
     },
     {
       "id": "bluekite", "model": "roadster", "name": "藍鳶", "tier": "normal", "color": "#2a6fb8",
-      "topSpeedKmh": 242, "power": 6.4, "cruiseKmh": 115,
+      "topSpeedKmh": 178, "power": 3.97, "cruiseKmh": 115,
       "cornerSkill": 0.82, "aggression": 0.45, "block": 0.25, "mistake": 0.25
     },
     {
       "id": "stoneowl", "model": "notch", "name": "石鴞", "tier": "normal", "color": "#d9d9d2",
-      "topSpeedKmh": 246, "power": 6.5, "cruiseKmh": 116,
+      "topSpeedKmh": 181, "power": 4.03, "cruiseKmh": 116,
       "cornerSkill": 0.66, "aggression": 0.55, "block": 0.45, "mistake": 0.25
     },
     {
       "id": "crow", "model": "wagon", "name": "旅鴉", "tier": "normal", "color": "#1c3a2a",
-      "topSpeedKmh": 256, "power": 6.8, "cruiseKmh": 120,
+      "topSpeedKmh": 188, "power": 4.22, "cruiseKmh": 120,
       "cornerSkill": 0.7, "aggression": 0.7, "block": 0.55, "mistake": 0.18
     },
     {
       "id": "ironmask", "model": "gt", "name": "鐵面", "tier": "elite", "color": "#2e3138",
-      "topSpeedKmh": 268, "power": 7.2, "cruiseKmh": 126,
+      "topSpeedKmh": 197, "power": 4.46, "cruiseKmh": 126,
       "cornerSkill": 0.92, "aggression": 0.8, "block": 0.7, "mistake": 0.08
     },
     {
       "id": "whitefang", "model": "gtWing", "name": "白牙", "tier": "elite", "color": "#e8e8e4",
-      "topSpeedKmh": 274, "power": 7.4, "cruiseKmh": 128,
+      "topSpeedKmh": 201, "power": 4.59, "cruiseKmh": 128,
       "cornerSkill": 0.95, "aggression": 0.95, "block": 0.5, "mistake": 0.05
     },
     {
       "id": "thunderbull", "model": "muscle", "name": "雷牛", "tier": "elite", "color": "#c85a12",
-      "topSpeedKmh": 278, "power": 7.6, "cruiseKmh": 126,
+      "topSpeedKmh": 204, "power": 4.71, "cruiseKmh": 126,
       "cornerSkill": 0.84, "aggression": 0.9, "block": 0.6, "mistake": 0.1
     },
     {
       "id": "sandfox", "model": "rally", "name": "砂狐", "tier": "elite", "color": "#d8cdb0",
-      "topSpeedKmh": 264, "power": 7.5, "cruiseKmh": 126,
+      "topSpeedKmh": 194, "power": 4.65, "cruiseKmh": 126,
       "cornerSkill": 0.97, "aggression": 0.85, "block": 0.55, "mistake": 0.06
     },
     {
       "id": "blackheron", "model": "luxury", "name": "黑鷺", "tier": "elite", "color": "#16181d",
-      "topSpeedKmh": 272, "power": 7.3, "cruiseKmh": 128,
+      "topSpeedKmh": 200, "power": 4.53, "cruiseKmh": 128,
       "cornerSkill": 0.88, "aggression": 0.75, "block": 0.85, "mistake": 0.07
     },
     {
       "id": "mystery", "model": "phantom", "name": "？？？", "tier": "mystery", "color": "#3a1a5a",
-      "topSpeedKmh": 270, "power": 7.3, "cruiseKmh": 130,
+      "topSpeedKmh": 198, "power": 4.53, "cruiseKmh": 130,
       "cornerSkill": 0.9, "aggression": 0.9, "block": 0.3, "mistake": 0.15
     },
     {
       "id": "yasha", "model": "bossCorner", "name": "夜叉", "title": "彎道之王", "tier": "boss", "color": "#b01030",
-      "topSpeedKmh": 262, "power": 7.4, "cruiseKmh": 125,
+      "topSpeedKmh": 202, "power": 4.6, "cruiseKmh": 125,
       "cornerSkill": 1.0, "aggression": 0.9, "block": 0.45, "mistake": 0,
-      "special": "cornerKing", "car": { "latAccelMax": 23, "grip": 10 },
+      "special": "cornerKing", "car": { "latAccelMax": 20.5, "grip": 10 },
       "radio": { "intro": "環狀線是我的地盤。跟得上再說。", "win": "彎道裡，沒有人贏得了我。", "lose": "……竟然在彎道輸了。" }
     },
     {
       "id": "typhoon", "model": "bossSpeed", "name": "颶風", "title": "極速怪物", "tier": "boss", "color": "#f0f0f4",
-      "topSpeedKmh": 296, "power": 8.2, "cruiseKmh": 130,
+      "topSpeedKmh": 232, "power": 5.3, "cruiseKmh": 130,
       "cornerSkill": 0.8, "aggression": 0.85, "block": 0.3, "mistake": 0.05,
       "special": "nitro", "nitro": { "seconds": 3.5, "cooldown": 9, "accel": 5, "topMul": 1.08, "straightAhead": 260 },
       "radio": { "intro": "直線上，你只看得到我的尾燈。", "win": "太慢了。", "lose": "……引擎，還不夠。" }
     },
     {
       "id": "akatsuki", "model": "bossFinal", "name": "曉", "title": "終極對手", "tier": "boss", "color": "#101014",
-      "topSpeedKmh": 282, "power": 7.9, "cruiseKmh": 130,
+      "topSpeedKmh": 226, "power": 5.0, "cruiseKmh": 130,
       "cornerSkill": 0.97, "aggression": 1.0, "block": 1.0, "mistake": 0,
-      "special": "blocker", "car": { "latAccelMax": 20.5 },
+      "special": "blocker", "car": { "latAccelMax": 18 },
       "radio": { "intro": "天亮之前，你過不了我這一關。", "win": "回去吧。天要亮了。", "lose": "……這條路，交給你了。" }
     }
   ]

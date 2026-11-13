@@ -193,7 +193,8 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
       car = createCarAudio(ctx, engBus, { cylinders: 6, turbo: true, ...engine, volume: ENGINE_LEVEL });
       loadAll().then(() => {
         // 發動聲播 1 秒多就淡掉，換成合成的引擎聲接手
-        const s = play('engine_start_01', { gain: 0.55, jitter: 0 });
+        // 開局車子已經在路上跑，就不播發動聲，引擎聲直接淡入
+        const s = Math.abs(state.vf) < 3 ? play('engine_start_01', { gain: 0.55, jitter: 0 }) : null;
         const t = ctx.currentTime;
         if (s) { s.g.gain.setValueAtTime(0.55, t + 0.9); s.g.gain.linearRampToValueAtTime(0, t + 1.9); s.src.stop(t + 2); }
         engBus.gain.setValueAtTime(0, t + (s ? 0.5 : 0));

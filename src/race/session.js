@@ -27,7 +27,7 @@ import { drive, createAiMemory } from '../vehicle/ai.js';
 export const ROAD_AHEAD = 2800, ROAD_BEHIND = 560;
 const NONE = [];
 
-export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events, mode = 'run' }) {
+export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events, mode = 'run' }) {
   const ev = events || createEvents();
   const emit = (name, payload) => ev.emit(name, payload);
   // 道路生成、車流、對手、節點各用獨立的亂數流，互不影響，方便重現
@@ -42,8 +42,10 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
   const flowRng = createRng(seed ^ 0x51ed270b);
   const menuRng = createRng(seed ^ 0x3c6ef372);
 
-  const state = createCarState({ s: 20, d: 0 });
-  const rival = createRival(carCfg, rivalRng);
+  // 開局就已經在路上跑（高速公路上從 0 起步很怪）
+  const state = createCarState({ s: 20, d: 0, vf: mode === 'run' ? (carCfg.startKmh || 0) / 3.6 : 0 });
+  // 對手用自己的底盤數值，不跟著玩家選的車變
+  const rival = createRival(rivalBase ? { ...carCfg, ...rivalBase } : carCfg, rivalRng);
   const duel = createDuel(duelCfg, ev);
 
   // 成長：carCfg 是基準值（對手也用它），playerCfg 是套用成長後玩家實際用的數值
@@ -348,7 +350,10 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
           const pool = rivals.filter((r) => r.tier === flow.rivalPending);
           const n = tierCount[flow.rivalPending] || 0;
           const sAt = Math.max(flow.nodeStartS + runCfg.nodes.rivalSpawnAfterFork, state.s + duelCfg.spawnAhead + Math.max(0, state.vf) * 1.5);
-          if (S.spawnRival(pool[n % pool.length], sAt)) { tierCount[flow.rivalPending] = n + 1; flow.rivalPending = null; }
+          // 越後面的夜晚，同一批對手的車越快
+          const nt = nights ? nights[S.run.night - 1] : null, base = pool[n % pool.length];
+          const def = nt && (nt.rivalTop || nt.rivalPower) ? { ...base, topSpeedKmh: Math.round(base.topSpeedKmh * (nt.rivalTop ?? 1)), power: base.power * (nt.rivalPower ?? 1) } : base;
+          if (S.spawnRival(def, sAt)) { tierCount[flow.rivalPending] = n + 1; flow.rivalPending = null; }
         }
       } else if (duel.phase === 'marked') {
         // 一直不挑戰：超過對手一段距離、或這個節點開太遠，對手離開
@@ -539,6 +544,8 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
     });
   }
   /** 基準值被熱更新後重算生效值 */
+  /** 開局選車後套用：車速歸到起步速度 */
+  S.resetStart = () => { state.vf = mode === 'run' ? (carCfg.startKmh || 0) / 3.6 : 0; S.prev.s = state.s; };
   S.recompute = () => { duelBase.threshold = duelCfg.threshold; if (upgrades) upgrades.recompute(); else Object.assign(playerCfg, carCfg); };
   if (mode !== 'run') traffic.density = 1;
   if (nights) traffic.typeWeights = zoneOf(1).traffic?.typeWeights || null;

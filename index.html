@@ -130,6 +130,17 @@
   .r-rare .cmeta { color: #8cc4ff; opacity: 1; } .r-legendary .cmeta { color: #ffc86a; opacity: 1; }
   .cname { font-size: 20px; font-weight: 700; margin: 5px 0 6px; letter-spacing: 1px; }
   .cdesc { font-size: 14px; line-height: 1.45; opacity: .9; }
+  /* 開局選車：標題與按鈕收起來，三張車卡排在畫面下方，上面看得到正在預覽的車 */
+  #carSelect { display: none; position: absolute; left: 0; right: 0; bottom: 5%; }
+  .picking #carSelect { display: block; }
+  .picking #title h1, .picking #title h2, .picking #title .tbtn, .picking #title > p, .picking #settings { display: none !important; }
+  .picking #title { background: none; }
+  #carSelect h3 { text-align: center; font-size: 18px; letter-spacing: 6px; margin: 0 0 12px; font-weight: 400; text-shadow: 0 1px 6px #000; }
+  #carCards { display: flex; justify-content: center; gap: 14px; padding: 0 16px; }
+  #carCards .card { cursor: pointer; flex: 0 1 270px; }
+  .cstat { display: grid; grid-template-columns: 3em 1fr; align-items: center; gap: 8px; font-size: 12px; margin-top: 4px; opacity: .9; }
+  .cstat i { display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #8cc4ff var(--p), rgba(255,255,255,.14) var(--p)); }
+  #carHint { text-align: center; margin-top: 12px; font-size: 13px; letter-spacing: 2px; opacity: .7; }
   .cprice { margin-top: 8px; font-size: 14px; color: #ffe08a; font-variant-numeric: tabular-nums; }
   .cprice.no { color: #ff8a70; }
   #menuHint { text-align: center; font-size: 13px; letter-spacing: 2px; opacity: .8; margin-top: 10px; min-height: 18px; }
@@ -182,9 +193,14 @@
         <div><b>W / ↑</b>油門</div><div><b>S / ↓</b>煞車／倒車</div><div><b>A D / ← →</b>轉向</div><div><b>空白鍵</b>手煞車（甩尾）</div>
         <div><b>H</b>閃燈</div><div><b>C</b>切換視角</div><div><b>Q</b>向後看</div><div><b>Esc</b>暫停</div>
       </div>
-      <div class="later">音量、陰影、後處理的設定在 M7 加入</div>
+
     </div>
     <p>在天亮前擊敗每一晚的 Boss　共三晚</p>
+    <div id="carSelect">
+      <h3>選擇你的車</h3>
+      <div id="carCards"></div>
+      <div id="carHint">← → 選擇　Enter 出發　Esc 返回</div>
+    </div>
   </div>
   <div id="over"><h1 id="overTitle">天亮了</h1><p id="overSub"></p><table id="overTable"></table><small>按 R 重新開始</small></div>
   <div id="toast"></div>

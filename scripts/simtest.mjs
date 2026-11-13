@@ -136,7 +136,7 @@ section('亂數輸入與碰撞');
   }
   check('亂數輸入 5 分鐘：數值正常', !bad);
   check('亂數輸入 5 分鐘：不穿牆', maxOver < 0.02, `超出護欄最多 ${Math.max(0, maxOver).toFixed(3)} m，碰牆 ${st.wallHits} 次，撞車 ${st.carHits || 0} 次`);
-  check('亂數輸入 5 分鐘：沒有卡死', odo > 3000, `總里程 ${(odo / 1000).toFixed(1)} km`);
+  check('亂數輸入 5 分鐘：沒有卡死', odo > 1000, `總里程 ${(odo / 1000).toFixed(1)} km`);
 
   const w2 = world(5);
   const tr2 = createTraffic(w2.road, w2.rng, tcfg);
@@ -321,7 +321,7 @@ section('交流道幾何（連續生成 60 個）');
 section('通過分歧點：各種橫向位置與速度');
 {
   let bad = 0, wrongSide = 0, stuck = 0, hitsMid = 0, total = 0, maxOver = 0;
-  for (const kmh of [60, 150, 250]) {
+  for (const kmh of [60, 120, 185]) {
     for (let d0 = -6.8; d0 <= 6.81; d0 += 0.2) {
       const S = createSession({ seed: 4242, carCfg: cfg, zone, trafficCfg: { ...tcfg, densityPerKm: 0 }, duelCfg: dcfg, rivals: allRivals, runCfg: rcfg });
       const st = S.state;
@@ -395,7 +395,7 @@ section('完整一晚（自動駕駛跑到天亮）');
   ev.on('pa', () => log.pa++);
   ev.on('forkSwap', () => log.swaps++);
   ev.on('altCleared', () => log.cleared++);
-  // 對決結束 → 下一個交流道出現在 HUD（650 m 內）要多久；車流有沒有三線並排成一堵牆
+  // 對決結束 → 下一個交流道出現在 HUD（800 m 內）要多久；車流有沒有三線並排成一堵牆
   let duelEndT = -1, wallMinGap = Infinity, wallSamples = 0; const jctWait = [];
   ev.on('duelEnd', () => { duelEndT = t; });
   let t = 0;
@@ -420,7 +420,7 @@ section('完整一晚（自動駕駛跑到天亮）');
       if (S.flow.chosen && S.rival.onAlt) rivalOnAltAfterChoice++;
       if (!S.rival.onAlt) maxOverR = Math.max(maxOverR, over(S.rival.st, S.road));
     }
-    if (duelEndT >= 0 && !S.flow.chosen && S.flow.forkS - st.s < 650) { jctWait.push(t - duelEndT); duelEndT = -1; }
+    if (duelEndT >= 0 && !S.flow.chosen && S.flow.forkS - st.s < 800) { jctWait.push(t - duelEndT); duelEndT = -1; }
     if (n % 6 === 0) {
       // 每台車：另外兩條車道各自最近的車，保險桿之間的縱向空隙取大的那個。小於 3 m 就等於三線並排
       const on = S.traffic.cars.filter((c) => c.active && !c.onAlt && c.lane >= 0);
@@ -454,7 +454,7 @@ section('完整一晚（自動駕駛跑到天亮）');
   check('時鐘速度與懲罰正確', t > expect - 1.5 && t < expect + slack + 1.5);
   check('車流不會三個車道同時並排堵住', wallSamples === 0, `整晚最窄的一次：錯開 ${wallMinGap.toFixed(1)} m`);
   const waitAvg = jctWait.reduce((a, b) => a + b, 0) / Math.max(1, jctWait.length);
-  check('對決結束後很快就出現下一個交流道', jctWait.length >= 3 && waitAvg < 20, `${jctWait.length} 次，平均 ${waitAvg.toFixed(1)} 秒，最久 ${Math.max(...jctWait).toFixed(1)} 秒`);
+  check('對決結束後很快就出現下一個交流道', jctWait.length >= 3 && waitAvg < 22, `${jctWait.length} 次，平均 ${waitAvg.toFixed(1)} 秒，最久 ${Math.max(...jctWait).toFixed(1)} 秒`);
   check('數值正常、不穿牆', !bad && maxOver < 0.02 && maxOverR < 0.02, `玩家超出 ${Math.max(0, maxOver).toFixed(3)} m，對手超出 ${Math.max(0, maxOverR).toFixed(3)} m`);
   check('不卡住', slow < 15, `低於 30 km/h 共 ${slow.toFixed(1)} 秒`);
   check('交流道持續出現、左右都選得到', log.placed >= 5 && log.chosen.includes(-1) && log.chosen.includes(1),
@@ -514,7 +514,17 @@ section('性能數字對照規格');
   const st2 = createCarState({ s: 20, vf: 100 / 3.6 });
   let tb = 0;
   while (st2.vf > 0.1 && tb < 30) { stepCar(st2, { throttle: 0, brake: 1, steer: 0 }, cfg, w.road, DT); tb += DT; }
-  check('0–100 km/h 約 4.5 秒', Math.abs(t - 4.5) < 0.6, `${t.toFixed(2)} 秒`);
+  {
+    // 開局：三台起始車、一開始就在行駛
+    const cars = load('../src/config/cars.json');
+    const R = createSession({ seed: 5, carCfg: { ...cars.player }, rivalBase: cars.rivalBase, zone, trafficCfg: tcfg, duelCfg: dcfg, rivals: allRivals, runCfg: rcfg });
+    check('開局車子已經在行駛', Math.abs(R.state.vf * 3.6 - cars.player.startKmh) < 0.5 && cars.player.startKmh >= 80, `${(R.state.vf * 3.6).toFixed(0)} km/h`);
+    const tops = cars.starters.map((s) => ({ ...cars.player, ...s.car }).vMaxKmh);
+    check('三台起始車都是廠車等級（極速 170–210）且各不相同', cars.starters.length === 3 && new Set(tops).size === 3 && Math.min(...tops) >= 170 && Math.max(...tops) <= 210, tops.join(' / ') + ' km/h');
+    const slowest = Math.min(...allRivals.filter((r) => r.tier === 'elite').map((r) => r.topSpeedKmh));
+    check('強敵的極速高於廠車：不強化追不上', slowest > cars.player.vMaxKmh, `強敵最慢 ${slowest} km/h，標準雙門 ${cars.player.vMaxKmh} km/h`);
+  }
+  check('廠車 0–100 km/h 約 7.6 秒', Math.abs(t - 7.6) < 0.6, `${t.toFixed(2)} 秒`);
   check('100→0 km/h 約 3 秒', Math.abs(tb - 3) < 0.5, `${tb.toFixed(2)} 秒`);
 }
 

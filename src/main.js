@@ -37,6 +37,11 @@ const seed = Number(params.get('seed')) || 20261112;
 
 // 設定物件原地更新，改 JSON 存檔後由 Vite 熱更新直接生效
 const carCfg = { ...carsJson.player };
+// 開局選的車：廠車基準值加上這台車自己的差異。網址加 ?car=light|balanced|heavy 可直接指定（自動駕駛用）
+const starters = carsJson.starters;
+let starter = starters.find((s) => s.id === params.get('car')) || starters.find((s) => s.id === 'balanced') || starters[0];
+const applyStarter = () => Object.assign(carCfg, carsJson.player, starter.car, { model: starter.model });
+applyStarter();
 const camCfg = structuredClone(cameraJson);
 const trafficCfg = structuredClone(trafficJson);
 const duelCfg = structuredClone(duelJson);
@@ -51,7 +56,7 @@ const hud = createHud(DEBUG);
 // 事件要在建立 session 之前掛好：開局就會插入第一個交流道
 const boot = [];
 events.on('jctPlaced', (e) => boot.push(e));
-const session = createSession({ seed, carCfg, zone, zones: zonesJson, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events });
+const session = createSession({ seed, carCfg, rivalBase: carsJson.rivalBase, zone, zones: zonesJson, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events });
 const { road, traffic, state, rival, duel, clock, flow, playerCfg, upgrades, menus } = session;
 const choiceUi = createChoiceUi();
 const audio = createGameAudio({ events, state, traffic, rival });
@@ -90,7 +95,7 @@ function feedTrails(id, model, p, l, u, f, kmh, braking, gain = 1) {
     trails.feed(id + k, v3t.x, v3t.y, v3t.z, l.x * 0.07, l.y * 0.07, l.z * 0.07, a * gain);
   }
 }
-car = createCarModel({ spec: modelsJson[carCfg.model] || modelsJson.coupe });
+car = createCarModel({ spec: modelsJson[carCfg.model] || modelsJson.coupe, color: starter.color });
 scene.add(car.group);
 rivalCar = createCarModel({ player: false, color: 0x888888, spec: modelsJson.hatch });
 rivalCar.setView('chase');
@@ -259,11 +264,59 @@ function startRun() {
   rig.setView('chase');
   hud.night(1, session.zoneName, 2.2);
 }
-btnStart.addEventListener('click', startRun);
+// ── 開局選車：按「開始」後先三選一，選中的車會即時換到畫面上預覽
+const carCards = document.getElementById('carCards');
+let picking = false, pickIdx = Math.max(0, starters.indexOf(starter));
+const zeroTo100 = (c) => { // 用同一條加速公式估 0–100 km/h 的秒數（只是給卡片顯示用）
+  const vMax = c.vMaxKmh / 3.6, r = (c.dragCoef * vMax * vMax + c.rollResist) / c.power, vEng = vMax / Math.sqrt(Math.max(0.05, 1 - r));
+  let v = 0, t = 0;
+  while (v < 100 / 3.6 && t < 30) { v += (c.power * (1 - (v / vEng) ** 2) - c.dragCoef * v * v - c.rollResist) / 120; t += 1 / 120; }
+  return t;
+};
+function showPick(i) {
+  pickIdx = (i + starters.length) % starters.length;
+  starter = starters[pickIdx];
+  car.setSpec(modelsJson[starter.model] || modelsJson.coupe, starter.color);
+  car.setHdr(post.active);
+  [...carCards.children].forEach((el, k) => el.classList.toggle('active', k === pickIdx));
+}
+function openPick() {
+  if (started || picking) return;
+  picking = true;
+  settingsEl.classList.remove('on');
+  carCards.innerHTML = starters.map((s) => {
+    const c = { ...carsJson.player, ...s.car };
+    const bars = Object.entries(s.stats).map(([k, v]) => `<div class="cstat"><span>${k}</span><i style="--p:${v * 20}%"></i></div>`).join('');
+    return `<div class="card"><div class="cmeta">${s.tag}</div><div class="cname">${s.name}</div><div class="cdesc">${s.desc}</div>${bars}<div class="cprice">極速 ${c.vMaxKmh} km/h　0–100 約 ${zeroTo100(c).toFixed(1)} 秒</div></div>`;
+  }).join('');
+  [...carCards.children].forEach((el, k) => {
+    el.addEventListener('mouseenter', () => showPick(k));
+    el.addEventListener('click', () => { showPick(k); confirmPick(); });
+  });
+  document.body.classList.add('picking');
+  showPick(pickIdx);
+}
+function closePick() { picking = false; document.body.classList.remove('picking'); }
+function confirmPick() {
+  if (!picking) return;
+  closePick();
+  applyStarter();
+  session.recompute();
+  session.resetStart();
+  startRun();
+}
+btnStart.addEventListener('click', openPick);
 btnSettings.addEventListener('click', () => settingsEl.classList.toggle('on'));
 addEventListener('keydown', (e) => {
   if (started) return;
-  if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); startRun(); }
+  if (picking) {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') showPick(pickIdx - 1);
+    else if (e.code === 'ArrowRight' || e.code === 'KeyD') showPick(pickIdx + 1);
+    else if (e.code === 'Enter' || e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); confirmPick(); }
+    else if (e.code === 'Escape') closePick();
+    return;
+  }
+  if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); openPick(); }
   else if (e.code === 'Tab') { e.preventDefault(); settingsEl.classList.toggle('on'); }
 });
 hud.title(!started);
@@ -304,7 +357,7 @@ const tagInfo = { active: false, onScreen: false, x: 0, y: 0, ahead: 0, name: ''
 
 function render(alpha, dt) {
   const edges = input.poll();
-  if (edges.pause) { paused = !paused; hud.setPaused(paused); audio.setPaused(paused || document.hidden); }
+  if (edges.pause && started) { paused = !paused; hud.setPaused(paused); audio.setPaused(paused || document.hidden); }
   if (edges.view) {
     const v = rig.nextView();
     car.setView(v);
@@ -374,7 +427,7 @@ function render(alpha, dt) {
   }
 
   if (started && !paused) audio.update(dt, (AUTOPILOT ? aiInput : input.held).throttle);
-  { const k = Math.min(1, Math.max(0, (kmh - 110) / 150)); post.speed = paused || !started ? 0 : k * k * (3 - 2 * k); }
+  { const k = Math.min(1, Math.max(0, (kmh - 90) / 130)); post.speed = paused || !started ? 0 : k * k * (3 - 2 * k); }
   reflection.render(scene, rig.camera, pose.p, pose.u);
   post.render(scene, rig.camera, dt);
 
@@ -406,7 +459,7 @@ function render(alpha, dt) {
   choiceUi.update(menus, session.run, upgrades);
   setDaylight(clock.progress);
   const toFork = flow.forkS - state.s;
-  if (!flow.chosen && flow.options && toFork < 650 && toFork > -5) {
+  if (!flow.chosen && flow.options && toFork < 800 && toFork > -5) {
     jctInfo.left = NODE_TYPES[flow.options[0]]; jctInfo.right = NODE_TYPES[flow.options[1]];
     jctInfo.dist = toFork; jctInfo.side = state.d > 0 ? 1 : -1;
     hud.junction(jctInfo);
@@ -452,7 +505,7 @@ if (AUTOPILOT) hud.toast('自動駕駛', 2.5);
 
 // 除錯與自動化測試用
 window.__game = {
-  post, gfx, applyGfx, streamer, scene, trails, reflection, audio,
+  post, gfx, applyGfx, streamer, scene, trails, reflection, audio, starters, openPick, showPick, confirmPick,
   models: modelsJson,
   session, state, road, carCfg, playerCfg, upgrades, menus, camCfg, trafficCfg, duelCfg, runCfg, clock, flow, rig, loop, renderer, car, rivalCar, traffic, streamer, duel, rival,
   /** 快轉模擬 sec 秒後畫一幀（分頁在背景、rAF 被節流時用）。會照常串流道路網格。 */
@@ -491,7 +544,7 @@ if (import.meta.hot) {
       if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k]) && dst[k]) Object.assign(dst[k], src[k]); else dst[k] = src[k];
     }
   };
-  import.meta.hot.accept('./config/cars.json', (m) => { Object.assign(carCfg, m.default.player); session.recompute(); hud.toast('車輛參數已更新'); });
+  import.meta.hot.accept('./config/cars.json', (m) => { Object.assign(carsJson.player, m.default.player); applyStarter(); session.recompute(); hud.toast('車輛參數已更新'); });
   import.meta.hot.accept('./config/upgrades.json', (m) => {
     merge(upgradeCfg.rules, m.default.rules);
     m.default.list.forEach((d) => { const cur = upgradeCfg.list.find((x) => x.id === d.id); if (cur) Object.assign(cur, d); });
