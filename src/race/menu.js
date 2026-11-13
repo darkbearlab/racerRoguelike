@@ -1,7 +1,7 @@
 // 路上的選單：獲勝後的三選一、PA 商店。純邏輯，不依賴畫面。
-// 選單開著的時候車子由自動駕駛保持車道、時鐘變慢但不暫停；操作只有四個方向。
+// 三選一：世界停住、沒有時間限制。商店：車子由自動駕駛保持車道、時鐘變慢但不暫停。操作只有四個方向。
 //
-//   三選一：← 左卡、↑ 中卡、→ 右卡；時間到沒選就改拿賞金
+//   三選一：← 左卡、↑ 中卡、→ 右卡；↓ 都不要，改拿賞金
 //   商店：  ← → 移動游標、↑ 確認、↓ 離開（移除模式下 ↓ 是返回）
 export function createMenus({ upgrades, rng, run, emit }) {
   const rules = upgrades.rules;
@@ -17,7 +17,7 @@ export function createMenus({ upgrades, rng, run, emit }) {
         emit('menuSkipped', { bounty: rules.skipBounty, empty: true });
         return false;
       }
-      M.current = { kind: 'choice', tier, cards, timer: rules.choiceSeconds, total: rules.choiceSeconds, lock: rules.lockSeconds };
+      M.current = { kind: 'choice', tier, cards, timer: Infinity, total: Infinity, lock: rules.lockSeconds };
       M.version++;
       emit('menuOpen', { kind: 'choice' });
       return true;
@@ -50,6 +50,13 @@ export function createMenus({ upgrades, rng, run, emit }) {
       const m = M.current;
       if (!m || m.lock > 0) return false;
       if (m.kind === 'choice') {
+        if (dir === 'down') {
+          // 都不要：改拿賞金
+          run.bounty += rules.skipBounty;
+          emit('menuSkipped', { bounty: rules.skipBounty });
+          M.close('skipped');
+          return true;
+        }
         const i = dir === 'left' ? 0 : dir === 'up' ? 1 : dir === 'right' ? 2 : -1;
         // 只有兩張時 ← →；只有一張時三個方向都選它
         const idx = m.cards.length === 1 ? (i >= 0 ? 0 : -1) : m.cards.length === 2 ? (i === 0 ? 0 : i === 2 ? 1 : -1) : i;
@@ -110,14 +117,9 @@ export function createMenus({ upgrades, rng, run, emit }) {
       const m = M.current;
       if (!m) return;
       if (m.lock > 0) m.lock -= dt;
+      if (m.kind === 'choice') return;   // 三選一沒有時間限制
       m.timer -= dt;
-      if (m.timer <= 0) {
-        if (m.kind === 'choice') {
-          run.bounty += rules.skipBounty; // 10 秒內未選：自動放棄，改為獲得賞金
-          emit('menuSkipped', { bounty: rules.skipBounty });
-        }
-        M.close('timeout');
-      }
+      if (m.timer <= 0) M.close('timeout');
     },
   };
   return M;

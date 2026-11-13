@@ -104,6 +104,9 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
     cleared: 0,          // 這場對決開賽前收掉幾台車（除錯與測試用）
     applied: true,
     over: null,          // { reason: 'dawn' }
+    pendingChoice: null, // 獲勝後等著開的三選一 { tier, t }：先顯示勝利，世界慢下來停住才出現
+    resumeT: 1,          // 選完後世界恢復速度的進度 0–1
+    timeScale: 1,        // 目前世界的時間倍率（給畫面與除錯用）
     time: 0,
 
     /** 靠近對手到挑戰範圍內就自動開始倒數（step 裡每步會自己呼叫，不需要玩家按鍵） */
@@ -118,7 +121,6 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
       const lim = road.halfWidth - 1.3;
       S.gridD = Math.min(lim, Math.max(-lim, state.d));
       S.clearT = duelCfg.countdown + (duelCfg.clearAfterGo ?? 2);
-      S.cleared = 0;
       return duel.challenge();
     },
 
@@ -190,6 +192,34 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
       const prev = S.prev;
       prev.s = state.s; prev.d = state.d; prev.psi = state.psi;
 
+      // ── 三選一開著：世界完全停住，沒有時間限制，選完才繼續
+      if (S.menus && S.menus.current && S.menus.current.kind === 'choice') {
+        S.menus.update(dt);
+        if (rival.active) { rival.prev.s = rival.st.s; rival.prev.d = rival.st.d; rival.prev.psi = rival.st.psi; }
+        S.timeScale = 0; S.resumeT = 0;
+        S.realTime += dt;
+        return;
+      }
+      // ── 獲勝後：勝利字樣先亮一下，世界再慢下來，停住才出現三選一
+      const realDt = dt;
+      let scale = 1;
+      if (S.pendingChoice) {
+        const pc = S.pendingChoice, hold = runCfg?.choice?.holdSeconds ?? 1.2, ramp = runCfg?.choice?.slowSeconds ?? 1.5;
+        pc.t += dt;
+        scale = pc.t < hold ? 1 : 1 - (pc.t - hold) / ramp;
+        if (scale <= 0.04) {
+          S.pendingChoice = null;
+          S.timeScale = 0;
+          if (S.menus.openChoice(pc.tier)) { S.resumeT = 0; S.realTime += dt; return; }
+          scale = 0.04;
+        }
+      } else if (S.resumeT < 1) {
+        S.resumeT = Math.min(1, S.resumeT + dt / 0.6);   // 選完後 0.6 秒內恢復原速
+        scale = Math.max(0.08, S.resumeT);
+      }
+      S.timeScale = scale;
+      dt *= scale;
+
       // ── 選單開著：車子由自動駕駛保持車道，時鐘變慢但不暫停，期間不會被撞
       const menu = S.menus ? S.menus.current : null;
       if (menu) {
@@ -241,12 +271,14 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
 
       // ── 車流
       traffic.update(dt, playerProxy, rival.active ? racers : onlyPlayer);
-      // 倒數與剛開賽的幾秒：把兩台車前後的車流收掉，不會還沒開打就撞上
-      if (S.clearT > 0) {
-        S.clearT -= dt;
-        if (rival.active && (duel.phase === 'countdown' || duel.phase === 'racing')) {
-          S.cleared += traffic.clearRange(Math.min(state.s, rival.st.s) - (duelCfg.clearBehind ?? 60), Math.max(state.s, rival.st.s) + (duelCfg.clearAhead ?? 380));
-        } else S.clearT = 0;
+      // 對手前方一段距離不留車流：對手一出現就開始，車是在遠處被收掉的，玩家靠近時那一段已經是空的。
+      // 倒數與剛開賽的幾秒也維持淨空，不會還沒開打就撞上
+      if (S.clearT > 0) S.clearT -= dt;
+      if (rival.active && !rival.onAlt) {
+        const ca = duelCfg.clearAhead ?? 380, rs = rival.st;
+        if (rival.intro) S.cleared += traffic.clearRange(state.s + 220, state.s + 220 + ca);   // Boss 從後方登場：先清遠處
+        else if (duel.phase === 'marked') S.cleared += traffic.clearRange(rs.s - (duelCfg.clearBehind ?? 50), rs.s + ca);
+        else if (duel.phase === 'countdown' || (duel.phase === 'racing' && S.clearT > 0)) S.cleared += traffic.clearRange(Math.min(state.s, rs.s) - 15, Math.max(state.s, rs.s) + ca);
       }
 
       // ── 對手
@@ -291,7 +323,7 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
           if (tier === 'boss') { S.run.bossWins++; S.pendingNight = true; } else S.run.nightDefeats++;
           S.run.bounty += duelCfg.bountyByTier?.[tier] ?? duelCfg.bounty;
           // 獲勝：三選一成長
-          if (S.menus) { menuAi.cap = Math.min(45, Math.max(22, state.vf)); menuAi.mem.lane = Math.round(state.d / road.laneWidth + 1); S.menus.openChoice(tier); }
+          if (S.menus) S.pendingChoice = { tier, t: 0 };
         }
         else {
           const lose = duelCfg.loseMinutesByTier?.[tier] ?? duelCfg.loseMinutes;
@@ -394,7 +426,7 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
         }
       }
       S.time += dt;
-      S.realTime += dt;
+      S.realTime += realDt;
     },
 
     /** Boss 從玩家後方登場 */

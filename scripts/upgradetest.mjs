@@ -173,38 +173,51 @@ section('三選一');
     if (!S.spawnRival(def, S.state.s + 60)) throw new Error('對手生成失敗');
     S.duel.challenge(); S.applied = false;
     S.duel.finish(true, 'score');
-    S.step(DT, { throttle: 1, brake: 0, steer: 0 });
+    // 勝利後世界先慢下來、停住，三選一才出現：記錄這段的時間倍率
+    const log = { t: 0, minScale: 1, sawFull: false, s0: S.state.s };
+    while (!S.menus.current && log.t < 6) {
+      S.step(DT, { throttle: 1, brake: 0, steer: 0 }); log.t += DT;
+      if (S.timeScale > 0.99) log.sawFull = true;
+      if (S.timeScale > 0) log.minScale = Math.min(log.minScale, S.timeScale);
+    }
+    return log;
   };
   const S = session([], { mode: 'run' });
   const b0 = S.run.bounty;
-  win(S);
+  const slow = win(S);
   const m = S.menus.current;
+  check('勝利後先慢動作再停住，才出現三選一', !!m && slow.sawFull && slow.minScale < 0.15 && slow.t > 2 && slow.t < 3.5, `${slow.t.toFixed(1)} 秒後出現，最慢到 ${(slow.minScale * 100).toFixed(0)}% 速度`);
   check('獲勝後出現三張不重複的卡', !!m && m.kind === 'choice' && m.cards.length === 3 && new Set(m.cards.map((c) => c.id)).size === 3, m ? m.cards.map((c) => c.name).join('、') : '');
   check('獲勝給賞金', S.run.bounty - b0 === dcfg.bountyByTier.normal, `+${S.run.bounty - b0}`);
-  S.step(DT, { throttle: 0, brake: 0, steer: 0 });
-  check('選擇時時鐘減慢為 1/4（不暫停）', S.clock.scale === 0.25);
-  check('剛出現的 0.6 秒內不接受輸入（避免誤觸）', S.menus.input('up') === false && !!S.menus.current);
+  const min0 = S.clock.minute, s0 = S.state.s;
+  for (let i = 0; i < 30; i++) S.step(DT, { throttle: 1, brake: 0, steer: 0 });
+  check('選擇時世界停住：車不動、時鐘不走', S.state.s === s0 && S.clock.minute === min0 && S.timeScale === 0);
+  {
+    const L = session([], { mode: 'run' }); win(L);
+    check('剛出現的 0.6 秒內不接受輸入（避免誤觸）', L.menus.input('up') === false && !!L.menus.current);
+  }
   // 選單期間：車子自動保持車道、不會被撞
   const c = S.traffic.cars[0];
   Object.assign(c, { active: true, onAlt: false, lane: 1, toLane: 1, fromLane: 1, s: S.state.s + 1, d: S.state.d, v: 5, cruise: 5, timer: 99 });
   const hits0 = S.state.carHits || 0;
   const d0 = S.state.d;
   for (let i = 0; i < 45; i++) S.step(DT, { throttle: 0, brake: 0, steer: 1 }); // 玩家亂打方向盤也沒用
-  check('選單期間由自動駕駛保持車道、不會被撞', (S.state.carHits || 0) === hits0 && Math.abs(S.state.d - d0) < 3.6 && S.state.vf > 15,
+  check('選單期間不會被撞、車速保留到選完之後', (S.state.carHits || 0) === hits0 && Math.abs(S.state.d - d0) < 0.01 && S.state.vf > 15,
     `速度 ${(S.state.vf * 3.6).toFixed(0)} km/h，橫移 ${Math.abs(S.state.d - d0).toFixed(1)} m`);
   c.active = false;
   const want = S.menus.current.cards[1];
   check('↑ 選中間那張並立刻生效', S.menus.input('up') && S.upgrades.count(want.id) === 1 && !S.menus.current, want.name);
-  S.step(DT, { throttle: 0, brake: 0, steer: 0 });
-  check('選完時鐘恢復正常', S.clock.scale === 1);
+  let tr = 0; const sR = S.state.s;
+  while (S.timeScale < 1 && tr < 3) { S.step(DT, { throttle: 1, brake: 0, steer: 0 }); tr += DT; }
+  check('選完後世界很快恢復原速', S.timeScale === 1 && tr < 1 && S.state.s > sR, `${tr.toFixed(2)} 秒`);
 
   const T = session([], { mode: 'run' });
   win(T);
   const bT = T.run.bounty, mT = T.clock.minute;
   let t = 0;
-  while (T.menus.current && t < 20) { T.step(DT, { throttle: 0, brake: 0, steer: 0 }); t += DT; }
-  check('10 秒未選：自動放棄，改拿賞金', near(t, ucfg.rules.choiceSeconds, 0.05) && T.run.bounty - bT === ucfg.rules.skipBounty && T.upgrades.total === 0,
-    `${t.toFixed(1)} 秒後關閉，賞金 +${T.run.bounty - bT}；這段時間時鐘只走了 ${(T.clock.minute - mT).toFixed(2)} 分鐘（正常速度會走 ${(t * 25 / 60).toFixed(2)}）`);
+  while (T.menus.current && t < 60) { T.step(DT, { throttle: 0, brake: 0, steer: 0 }); t += DT; }
+  check('沒有時間限制：放著一分鐘也不會自動關掉', !!T.menus.current && T.run.bounty === bT && T.clock.minute === mT, `等了 ${t.toFixed(0)} 秒`);
+  check('↓ 都不要：改拿賞金', T.menus.input('down') && !T.menus.current && T.run.bounty - bT === ucfg.rules.skipBounty && T.upgrades.total === 0, `賞金 +${T.run.bounty - bT}`);
 
   let rareOk = 0, eliteRare = 0, normRare = 0;
   for (let k = 0; k < 200; k++) {

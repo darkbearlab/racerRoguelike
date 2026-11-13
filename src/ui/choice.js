@@ -34,7 +34,7 @@ export function createChoiceUi() {
           title.textContent = '選擇一項成長';
           const keys = m.cards.length === 3 ? ['←', '↑', '→'] : m.cards.length === 2 ? ['←', '→'] : ['↑'];
           body.innerHTML = m.cards.map((d, i) => card(d, { key: keys[i], count: upgrades.count(d.id) + 1 })).join('');
-          hint.textContent = '時間到未選：改拿賞金';
+          hint.textContent = '↓ 都不要，改拿賞金';
         } else if (m && m.kind === 'shop') {
           if (m.mode === 'remove') {
             title.textContent = '移除哪一個成長？';
@@ -52,7 +52,7 @@ export function createChoiceUi() {
           }
         }
       }
-      if (m) bar.style.width = `${Math.max(0, (m.timer / m.total) * 100).toFixed(1)}%`;
+      if (m) bar.style.width = Number.isFinite(m.timer) ? `${Math.max(0, (m.timer / m.total) * 100).toFixed(1)}%` : '0%';
 
       // 持有的成長（左上）
       const list = upgrades.list();
