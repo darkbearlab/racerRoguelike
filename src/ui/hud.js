@@ -23,7 +23,7 @@ export function createHud(debugOn) {
   const count = $('count'), banner = $('banner');
   const defeats = $('defeats'), bounty = $('bounty'), runNote = $('runNote');
   const clockEl = $('clock'), clockTime = $('clockTime'), clockLeft = $('clockLeft');
-  const jct = $('jct'), jctL = $('jctL'), jctR = $('jctR'), jctDist = $('jctDist');
+  const jct = $('jct'), jctL = $('jctL'), jctR = $('jctR'), jctLName = $('jctLName'), jctRName = $('jctRName'), jctLDist = $('jctLDist'), jctRDist = $('jctRDist');
   let toastTimer = 0;
   let last = {};
   if (debugOn) { debug.style.display = 'block'; document.body.classList.add('debug-on'); }
@@ -125,9 +125,11 @@ export function createHud(debugOn) {
     junction(info) {
       set('jctOn', jct, 'display', info ? 'block' : 'none');
       if (!info) return;
-      set('jctL', jctL, 'text', `◀ ${info.left.icon} ${info.left.name}`);
-      set('jctR', jctR, 'text', `${info.right.icon} ${info.right.name} ▶`);
-      set('jctDist', jctDist, 'text', `${Math.max(0, Math.round(info.dist / 10) * 10)} m`);
+      set('jctL', jctLName, 'text', `◀ ${info.left.icon} ${info.left.name}`);
+      set('jctR', jctRName, 'text', `${info.right.icon} ${info.right.name} ▶`);
+      const dist = `${Math.max(0, Math.round(info.dist / 10) * 10)} m`;
+      set('jctDistL', jctLDist, 'text', dist);
+      set('jctDistR', jctRDist, 'text', dist);
       if (last.jctSide !== info.side) {
         last.jctSide = info.side;
         jctL.classList.toggle('pick', info.side < 0);

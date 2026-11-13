@@ -476,7 +476,7 @@ function render(alpha, dt) {
     car.mirror.visible = !!camCfg.mirror;
   }
 
-  if (started && !paused) audio.update(dt, (AUTOPILOT ? aiInput : input.held).throttle);
+  if (started && !paused) audio.update(dt, (AUTOPILOT ? aiInput : input.held).throttle, session.timeScale);
   // 三選一前的慢動作：時間越慢畫面越灰，選單開著時全灰；選完立刻恢復彩色
   const gray = session.pendingChoice || (menus.current && menus.current.kind === 'choice') ? Math.min(1, Math.max(0, 1 - session.timeScale)) : 0;
   if (gray !== lastGray) { lastGray = gray; canvas.style.filter = gray > 0.01 ? `grayscale(${gray.toFixed(2)})` : ''; }

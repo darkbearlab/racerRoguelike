@@ -22,6 +22,7 @@ const BGM = [
   'ebL05_burning_asphalt', 'ebL06_starlight_drift', 'ebL07_king_of_the_highway', 'ebL08_velocity_dream',
   'ebL09_ghost_of_the_tunnel', 'ebL10_dawn_breaker', 'ebL11_turbo_fantasy', 'ebL12_final_lap_emperor',
 ];
+const MIN_RATE = 0.08;    // <audio> 播放速度的下限（瀏覽器低於 0.0625 會出錯）
 const MUSIC_LEVEL = 0.5;  // 音樂音量滑桿拉滿時的實際增益
 const ENGINE_LEVEL = 0.34; // 合成器全油門時約 −9 dBFS，會蓋掉所有錄音，所以壓下來
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -44,7 +45,8 @@ function makeLoop(ctx, buf, t0, t1, xf) {
 
 export function createGameAudio({ events, state, traffic, rival, engine = {} }) {
   let ctx = null, master = null, sfxBus = null, engBus = null, car = null;
-  let scrapeG = null, ambG = null;
+  let scrapeG = null, ambG = null, timeBus = null, bgmTime = null, tscale = 1;
+  const live = new Set();   // 正在播的錄音（含循環的），時間變慢時一起降速
   const bufs = {};
   const armed = new WeakMap();
   let volume = 0.8, muted = false, suspended = false;
@@ -73,6 +75,7 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
     const name = nextName();
     const el = new Audio(`${BGM_BASE}${name}.mp3`);
     el.preload = 'auto';
+    el.preservesPitch = false; el.mozPreservesPitch = false; el.webkitPreservesPitch = false;   // 變慢時音高跟著掉，像唱盤被按住
     const src = ctx.createMediaElementSource(el), g = ctx.createGain();
     const t = ctx.currentTime;
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + fade);
@@ -92,7 +95,7 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
       return;
     }
     const el = cur.el;
-    if (el.ended) { cur.killAt = 0; startTrack(0.05); }   // 播完才換下一首
+    if (el.ended && tscale >= 1) { cur.killAt = 0; startTrack(0.05); }   // 播完才換下一首
   }
 
   function play(name, { gain = 1, rate = 1, pan = 0, offset = 0, fadeIn = 0, jitter = 0.05 } = {}) {
@@ -100,7 +103,9 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
     if (!ctx || !buf || suspended) return null;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.playbackRate.value = rate * (1 + (Math.random() * 2 - 1) * jitter);
+    const base = rate * (1 + (Math.random() * 2 - 1) * jitter), ent = { src, base };
+    src.playbackRate.value = base * tscale;
+    live.add(ent); src.onended = () => live.delete(ent);
     const g = ctx.createGain(), p = ctx.createStereoPanner();
     p.pan.value = clamp(pan, -1, 1);
     if (fadeIn > 0) { g.gain.setValueAtTime(0, ctx.currentTime); g.gain.linearRampToValueAtTime(gain, ctx.currentTime + fadeIn); } else g.gain.value = gain;
@@ -113,6 +118,7 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
     const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
     const g = ctx.createGain(); g.gain.value = gain;
     src.connect(g); g.connect(sfxBus); src.start();
+    live.add({ src, base: 1 });
     return g;
   }
 
@@ -186,9 +192,12 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
       master = ctx.createGain(); master.gain.value = muted ? 0 : volume;
       master.connect(lim); lim.connect(ctx.destination);
       api.out = lim; // 除錯用：從這裡接分析器量實際輸出
-      sfxBus = ctx.createGain(); sfxBus.connect(master);
-      engBus = ctx.createGain(); engBus.gain.value = 0; engBus.connect(master);
-      bgmBus = ctx.createGain(); bgmBus.gain.value = musicVol * MUSIC_LEVEL; bgmBus.connect(master);
+      // 時間倍率用的兩個增益：世界慢到快停時把聲音收掉（音高已經掉到底，留著只剩低頻轟轟聲）
+      timeBus = ctx.createGain(); timeBus.connect(master);
+      bgmTime = ctx.createGain(); bgmTime.connect(master);
+      sfxBus = ctx.createGain(); sfxBus.connect(timeBus);
+      engBus = ctx.createGain(); engBus.gain.value = 0; engBus.connect(timeBus);
+      bgmBus = ctx.createGain(); bgmBus.gain.value = musicVol * MUSIC_LEVEL; bgmBus.connect(bgmTime);
       car = createCarAudio(ctx, engBus, { cylinders: 6, turbo: true, ...engine, volume: ENGINE_LEVEL });
       loadAll().then(() => {
         // 發動聲播 1 秒多就淡掉，換成合成的引擎聲接手
@@ -205,12 +214,23 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
       suspended = p;
       if (!ctx) return;
       if (p) ctx.suspend(); else ctx.resume();
-      for (const d of decks) { if (p) d.el.pause(); else d.el.play().catch(() => {}); }
+      for (const d of decks) { if (p) d.el.pause(); else if (tscale >= MIN_RATE) d.el.play().catch(() => {}); }
     },
 
-    /** 每幀呼叫。throttle：玩家這一幀的油門 0–1 */
-    update(dt, throttle) {
+    /** 每幀呼叫。throttle：玩家這一幀的油門 0–1；timeScale：世界的時間倍率（三選一前的慢動作，0 = 停住） */
+    update(dt, throttle, timeScale = 1) {
       if (!ctx || suspended) return;
+      const ts = clamp(timeScale, 0, 1);
+      if (ts !== tscale) {
+        tscale = ts;
+        const t = ctx.currentTime, vol = clamp(ts / 0.3, 0, 1);
+        timeBus.gain.setTargetAtTime(vol, t, 0.03); bgmTime.gain.setTargetAtTime(vol, t, 0.03);
+        for (const e of live) e.src.playbackRate.setTargetAtTime(e.base * ts, t, 0.02);
+        for (const d of decks) {
+          // <audio> 的播放速度有下限，低於下限就直接暫停（這時音量也已經收到 0）
+          if (ts < MIN_RATE) { if (!d.el.paused) d.el.pause(); } else { d.el.playbackRate = ts; if (d.el.paused && !d.el.ended) d.el.play().catch(() => {}); }
+        }
+      }
       hitCool -= dt; passCool -= dt; shiftCool -= dt;
       tickMusic(dt);
       const kmh = Math.abs(state.vf) * 3.6, speed = Math.abs(state.vf);
@@ -236,7 +256,7 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
       // 胎嘯：甩尾時一定有；沒甩尾時橫移超過 2 m/s 才開始出聲
       const vl = Math.abs(state.vl || 0);
       const slip = state.drifting ? clamp(0.4 + vl / 8, 0, 1) : clamp((vl - 2) / 6, 0, 1);
-      car.update({ rpm, throttle: thr, speed, slip });
+      car.update({ rpm: rpm * (0.25 + 0.75 * tscale), throttle: thr, speed: speed * tscale, slip: slip * tscale });
 
       // 擦牆
       if (scrapeG) {

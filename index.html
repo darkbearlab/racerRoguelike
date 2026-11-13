@@ -68,11 +68,16 @@
   #clockTime { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 2px; }
   #clockLeft { font-size: 12px; letter-spacing: 2px; opacity: .75; }
   #clock.warn { color: #ff6a50; animation: blink 1s infinite; }
-  #jct { position: absolute; top: calc(24% + var(--mh, 0px)); left: 50%; transform: translateX(-50%); display: none; white-space: nowrap;
-         background: rgba(6,60,34,.85); border: 2px solid #e8f0e8; border-radius: 5px; font-size: 20px; letter-spacing: 2px; }
-  #jct span { display: inline-block; padding: 8px 20px; }
-  #jct .pick { background: rgba(255,255,255,.22); }
-  #jctDist { border-left: 1px solid rgba(255,255,255,.5); border-right: 1px solid rgba(255,255,255,.5); font-size: 15px; opacity: .9; font-variant-numeric: tabular-nums; }
+  /* 交流道選路：左右各一塊從畫面邊緣伸出來，中間留給路面 */
+  #jct { display: none; }
+  .jtab { position: absolute; top: calc(30% + var(--mh, 0px)); white-space: nowrap; padding: 9px 18px; font-size: 20px; letter-spacing: 2px;
+          background: rgba(6,60,34,.82); border: 2px solid #e8f0e8; opacity: .72; transition: opacity .15s, background .15s; }
+  #jctL { left: 0; border-left: 0; border-radius: 0 6px 6px 0; animation: jinL .35s ease-out; }
+  #jctR { right: 0; border-right: 0; border-radius: 6px 0 0 6px; text-align: right; animation: jinR .35s ease-out; }
+  .jtab.pick { opacity: 1; background: rgba(20,120,66,.92); box-shadow: 0 0 14px rgba(140,255,190,.45); }
+  .jtab .jd { font-size: 14px; opacity: .85; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  @keyframes jinL { from { transform: translateX(-100%); } }
+  @keyframes jinR { from { transform: translateX(100%); } }
   #over { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column;
           background: rgba(10,14,24,.82); pointer-events: auto; }
   #over h1 { font-size: 56px; letter-spacing: 14px; margin: 0 0 6px; font-weight: 800; }
@@ -177,7 +182,7 @@
   <div id="count"></div>
   <div id="banner"></div>
   <div id="clock"><div id="clockTime">00:00</div><div id="clockLeft"></div></div>
-  <div id="jct"><span id="jctL"></span><span id="jctDist"></span><span id="jctR"></span></div>
+  <div id="jct"><div id="jctL" class="jtab"><div id="jctLName"></div><div class="jd" id="jctLDist"></div></div><div id="jctR" class="jtab"><div id="jctRName"></div><div class="jd" id="jctRDist"></div></div></div>
   <div id="mirrorFrame"></div>
   <div id="title">
     <h1>深夜高架</h1>
