@@ -85,6 +85,12 @@ export function updateRival(r, dt, ctx) {
     o.speedCap = (def.cruiseKmh + (78 - def.cruiseKmh) * wait) / 3.6;
     // Boss 會配合玩家的速度待在前方不遠處，不會一下就被超過去
     if (def.tier === 'boss' && ahead < 90) o.speedCap = Math.max(o.speedCap, Math.min(player.v - 3, def.topSpeedKmh / 3.6));
+    // 玩家靠近：開始加速跟上玩家的車速。離得越近速差越小，進到開戰距離時幾乎等速
+    const mr = ctx.matchRange || 0, cr = ctx.challengeRange || 40;
+    if (mr > 0 && ahead > -6 && ahead < mr) {
+      const closing = 3 + 22 * clamp((ahead - cr) / Math.max(1, mr - cr), 0, 1);
+      o.speedCap = Math.max(o.speedCap, Math.min(player.v - closing, def.topSpeedKmh * 0.9 / 3.6));
+    }
   } else if (r.mode === 'grid') {
     // 行進中起跑：調整到與玩家並行或稍前；玩家若在正後方就只拉近，不擋到被追撞
     const sameLane = Math.abs(player.d - st.d) < 2.4;
@@ -94,6 +100,8 @@ export function updateRival(r, dt, ctx) {
     const floor = Math.max(12, Math.min(player.v, def.cruiseKmh / 3.6) - 2);
     o.speedCap = clamp(want, floor, Math.max(floor, player.v + 10));
     o.caution = 1.3;
+    // 自動開戰的倒數：目標速度由 session 決定（兩台車鎖在同一個速度），這裡只負責方向盤
+    if (ctx.gridTarget != null) { o.speedCap = ctx.gridTarget; o.topSpeedKmh = Math.max(def.topSpeedKmh, ctx.gridTarget * 3.6 + 10); r.mem.hold = 1; }
   } else if (r.mode === 'race') {
     o.line = true;
     // 橡皮筋（可關閉）：落後時極速略增、領先時略減

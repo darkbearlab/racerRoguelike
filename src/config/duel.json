@@ -1,5 +1,12 @@
 {
+  "autoChallenge": true,
   "challengeRange": 40,
+  "matchRange": 150,
+  "gridMinKmh": 80,
+  "gridTopFrac": 0.88,
+  "clearAhead": 380,
+  "clearBehind": 60,
+  "clearAfterGo": 2,
   "countdown": 3,
   "threshold": 40,
   "rateBase": 8,

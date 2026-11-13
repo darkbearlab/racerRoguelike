@@ -2,7 +2,7 @@
 // 純邏輯，不依賴 three.js。
 //
 //   gap = s_玩家 − s_對手（沿道路距離，彎道上也正確）
-//   phase: idle → marked（已標示，等挑戰）→ countdown → racing → result → idle
+//   phase: idle → marked（已標示，玩家靠近就自動開戰）→ countdown（鎖操作、等速）→ racing → result → idle
 export function createDuel(cfg, events) {
   const emit = (name, payload) => { if (events) events.emit(name, payload); };
   const d = {

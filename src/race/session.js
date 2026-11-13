@@ -56,6 +56,7 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
     world: { base: { trafficDensityMul: 1 }, out: world },
   }) : null;
   const menuAi = { mem: createAiMemory(), input: {}, cap: 40 };
+  const gridAi = { input: {} };
   const clock = runCfg ? createClock(runCfg.clock) : null;
   const playerProxy = { active: true, onAlt: false, s: state.s, d: 0, v: 0, len: 4.4, wid: 1.8, changeT: 0, toD: 0 };
   const obsForRival = [...traffic.cars, playerProxy];
@@ -98,15 +99,26 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
     rivalIndex: 0,
     respawnT: mode === 'loop' ? 1.5 : Infinity,
     leaveT: 0,
+    gridV: 0, gridD: 0,  // 倒數期間兩台車被鎖定的共同速度、玩家保持的橫向位置
+    clearT: 0,           // 還要淨空車流幾秒（倒數＋開賽後一小段）
+    cleared: 0,          // 這場對決開賽前收掉幾台車（除錯與測試用）
     applied: true,
     over: null,          // { reason: 'dawn' }
     time: 0,
 
-    /** 玩家閃燈：在挑戰範圍內就開始倒數 */
+    /** 靠近對手到挑戰範圍內就自動開始倒數（step 裡每步會自己呼叫，不需要玩家按鍵） */
     tryChallenge() {
       if (!rival.active || rival.onAlt || rival.intro || !duel.canChallenge(state, rival.st)) return false;
-      rival.flash = 0.5; // 對手以閃燈回應
+      rival.flash = 0.5; // 對手閃燈示意
       S.applied = false;
+      // 倒數期間兩台車鎖在同一個速度：取玩家當下的車速，但不低於下限、也不超過對手跟得上的範圍
+      const top = Math.min(playerCfg.vMaxKmh, rival.def.topSpeedKmh * (duelCfg.gridTopFrac ?? 0.88)) / 3.6;
+      S.gridV = Math.min(top, Math.max((duelCfg.gridMinKmh ?? 80) / 3.6, state.vf));
+      // 倒數期間保持當下的橫向位置（不換車道），只是不要貼著護欄
+      const lim = road.halfWidth - 1.3;
+      S.gridD = Math.min(lim, Math.max(-lim, state.d));
+      S.clearT = duelCfg.countdown + (duelCfg.clearAfterGo ?? 2);
+      S.cleared = 0;
       return duel.challenge();
     },
 
@@ -184,6 +196,16 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
         inp = drive(state, playerCfg, road, { obstacles: obsForPlayer, mem: menuAi.mem, dt, speedCap: menuAi.cap }, menuAi.input);
         S.menus.update(dt);
       }
+      // ── 對決倒數：玩家的操作鎖住，由系統保持車道、定速前進，直到出現 BATTLE
+      const grid = duel.phase === 'countdown' && !menu;
+      if (grid) { inp = drive(state, playerCfg, road, { obstacles: NONE, dTarget: S.gridD, dt, speedCap: S.gridV }, gridAi.input); inp.steer = 0; inp.handbrake = false; }
+      // 對手在倒數時的目標速度：前兩秒多用速差把距離收到「領先一兩個車身」，最後不到一秒回到完全等速
+      let gridTarget = null;
+      if (grid && rival.active) {
+        const lead = Math.abs(state.d - rival.st.d) < 2.4 ? 12 : 6;
+        const err = state.s + lead - rival.st.s;
+        gridTarget = S.gridV + (duel.timer > 0.8 ? Math.min(8, Math.max(-8, err * 0.8)) : 0);
+      }
       if (clock) clock.setChoosing(!!(S.menus && S.menus.current));
       const wasDrifting = state.drifting, driftTime = state.driftTime;
       if (S.boostT > 0) { S.boostT -= dt; if (S.boostT <= 0) state.boostAccel = 0; }
@@ -202,6 +224,14 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
       S.slip = traffic.slipstream(state, playerCfg.slipstreamRange, playerCfg.slipstreamWidth, rival.proxy);
       state.dragMul = S.slip ? 1 - Math.min(0.9, playerCfg.slipstreamDragCut) : 1;
       stepCar(state, inp, playerCfg, road, dt, ev);
+      // 強制等速：不管原本開多快，倒數時直接把車速拉到鎖定值
+      if (grid) {
+        state.vf += Math.min(14 * dt, Math.max(-14 * dt, S.gridV - state.vf));
+        // 橫向也鎖住：車頭回正、慢慢靠回開始倒數時的位置
+        const k = Math.min(1, 18 * dt);   // 要夠硬：彎道上方向盤回正的車會被甩向外側
+        state.psi -= state.psi * k; state.vl -= state.vl * k; state.yawRate = 0; state.steer -= state.steer * k;
+        state.d += (S.gridD - state.d) * Math.min(1, 6 * dt);
+      }
       if (upgrades && wasDrifting && !state.drifting) {
         const fired = upgrades.fire('onDriftEnd', S, { time: driftTime });
         if (fired.length) { S.lastHook = 'onDriftEnd'; emit('hookFired', { hook: 'onDriftEnd', ids: fired }); }
@@ -211,6 +241,13 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
 
       // ── 車流
       traffic.update(dt, playerProxy, rival.active ? racers : onlyPlayer);
+      // 倒數與剛開賽的幾秒：把兩台車前後的車流收掉，不會還沒開打就撞上
+      if (S.clearT > 0) {
+        S.clearT -= dt;
+        if (rival.active && (duel.phase === 'countdown' || duel.phase === 'racing')) {
+          S.cleared += traffic.clearRange(Math.min(state.s, rival.st.s) - (duelCfg.clearBehind ?? 60), Math.max(state.s, rival.st.s) + (duelCfg.clearAhead ?? 380));
+        } else S.clearT = 0;
+      }
 
       // ── 對手
       if (rival.active) {
@@ -225,10 +262,11 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
         updateRival(rival, dt, {
           road: onAlt ? S.alt : road,
           obstacles: onAlt || rival.intro ? NONE : obsForRival,
-          player: playerProxy, phase: duel.phase, rubber: duelCfg.rubberBand,
+          player: playerProxy, phase: duel.phase, rubber: duelCfg.rubberBand, matchRange: duelCfg.matchRange, challengeRange: duelCfg.challengeRange, gridTarget,
           slip: !onAlt && traffic.slipstream(rs, rival.cfg.slipstreamRange, rival.cfg.slipstreamWidth, playerProxy),
           jctSide: f ? (flow.chosen ? f.side : state.d > 0 ? 1 : -1) : 0,
         });
+        if (gridTarget != null) { rs.vf += Math.min(16 * dt, Math.max(-16 * dt, gridTarget - rs.vf)); rival.proxy.v = rs.vf; }
       } else { rival.proxy.active = false; rival.proxy.onAlt = false; }
 
       // ── 碰撞
@@ -241,7 +279,8 @@ export function createSession({ seed, carCfg, zone, zones, trafficCfg, duelCfg, 
         rival.proxy.s = rival.st.s; rival.proxy.d = rival.st.d; rival.proxy.v = rival.st.vf;
       }
 
-      // ── 對決計分
+      // ── 對決：靠近就自動開戰，然後計分
+      if (duelCfg.autoChallenge !== false && duel.phase === 'marked' && !menu) S.tryChallenge();
       if (rival.active) duel.update(dt, playerProxy, rival.proxy);
       if (duel.phase === 'result' && !S.applied) {
         S.applied = true;

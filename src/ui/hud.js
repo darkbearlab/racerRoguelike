@@ -166,6 +166,8 @@ export function createHud(debugOn) {
 
     countdown(text) {
       count.textContent = text;
+      count.style.fontSize = text.length > 2 ? 'min(120px, 17vw)' : '';
+      count.style.whiteSpace = 'nowrap';
       retrigger(count, 'pop');
     },
     zero(who) { retrigger(who === 'player' ? barP : barR, 'zeroed'); },

@@ -116,6 +116,13 @@ export function createTraffic(road, rng, cfg) {
     api.alt = null;
   };
 
+  /** 把主線上 [s0, s1] 之間的車全部收掉（對決倒數時淨空用）。回傳收了幾台 */
+  api.clearRange = (s0, s1) => {
+    let n = 0;
+    for (const c of cars) if (c.active && !c.onAlt && c.s >= s0 && c.s <= s1) { c.active = false; api.recycled++; n++; }
+    return n;
+  };
+
   // racers：要當成障礙的賽車（玩家、對手），元素為 { s, d, v, onAlt? }；生成與回收只看 player
   api.update = (dt, player, racers) => {
     if (!racers) { _one[0] = player; racers = _one; }

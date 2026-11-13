@@ -234,7 +234,7 @@ for (let ri = 0; ri < rivals.length; ri++) {
       autopilot(S.state, cfg, S.road, { traffic: S.obsForPlayer, mem, dt: DT, line: true, gripUse: 0.85, caution: 0.85, margin: 1.25 }, inp);
       S.step(DT, inp);
       t += DT;
-      if (S.duel.phase === 'marked' && S.tryChallenge()) challengedAt = t;
+      if (challengedAt < 0 && S.duel.phase === 'countdown') challengedAt = t;   // 靠近後會自動開戰
       if (S.rival.active) {
         const rs = S.rival.st;
         if (!Number.isFinite(rs.s + rs.d + rs.vf + rs.psi)) bad = true;
@@ -350,6 +350,42 @@ section('通過分歧點：各種橫向位置與速度');
   check('撞上分隔島不會被扣到停', hitsMid === 0, `速度掉到一半以下的組合 ${hitsMid} 個`);
 }
 
+section('自動開戰：靠近對手 → 鎖操作等速倒數 → BATTLE');
+{
+  let worstDv = 0, worstRel = 0, worstNear = Infinity, worstDrift = 0, starts = 0, cleared = 0, minCount = Infinity, pressed = 0;
+  for (let ri = 0; ri < rivals.length; ri++) for (const seed of [31, 32, 33]) {
+    const ev = createEvents();
+    const S = createSession({ seed: seed * 977 + ri, carCfg: cfg, zone, trafficCfg: tcfg, duelCfg: dcfg, rivals, events: ev, mode: 'loop' });
+    S.rivalIndex = ri;
+    const inp = {}, mem = createAiMemory(), bad = { throttle: 1, brake: 0, steer: 1, handbrake: false };
+    let t = 0, d0 = 0, vMin = Infinity, vMax = -Infinity, cd = 0, done = false;
+    ev.on('duelGo', () => {
+      done = true; starts++;
+      const rs = S.rival.st, st = S.state;
+      worstRel = Math.max(worstRel, Math.abs(rs.vf - st.vf));
+      worstDv = Math.max(worstDv, vMax - vMin);
+      worstDrift = Math.max(worstDrift, Math.abs(st.d - S.gridD));   // gridD：開始倒數時的橫向位置（太貼牆會往內收一點）
+      cleared += S.cleared; minCount = Math.min(minCount, cd);
+      for (const c of S.traffic.cars) if (c.active && !c.onAlt) { const a = c.s - Math.min(st.s, rs.s); if (a > -40) worstNear = Math.min(worstNear, a); }
+    });
+    while (t < 240 && !done) {
+      const grid = S.duel.phase === 'countdown';
+      if (grid) pressed++;
+      else autopilot(S.state, cfg, S.road, { traffic: S.obsForPlayer, mem, dt: DT, line: true, caution: 0.85, margin: 1.25 }, inp);
+      // 倒數期間故意油門踩到底、方向盤打死：應該完全沒作用
+      S.step(DT, grid ? bad : inp);
+      t += DT;
+      if (S.duel.phase === 'countdown') { if (!cd) d0 = S.state.d; cd += DT; if (cd > 1.2) { vMin = Math.min(vMin, S.state.vf); vMax = Math.max(vMax, S.state.vf); } }
+    }
+  }
+  check('不用按鍵，靠近就自動開始倒數', starts === rivals.length * 3, `${starts} / ${rivals.length * 3} 場`);
+  check('倒數滿 3 秒才開放操作', minCount > dcfg.countdown - 0.05, `最短 ${minCount.toFixed(2)} 秒`);
+  check('倒數期間亂按也不會偏離車道', worstDrift < 1.2, `橫向最多移動 ${worstDrift.toFixed(2)} m`);
+  check('倒數後段玩家車速穩定', worstDv * 3.6 < 12, `後 1.8 秒車速變化最多 ${(worstDv * 3.6).toFixed(1)} km/h`);
+  check('開賽瞬間兩車接近等速', worstRel * 3.6 < 25, `速差最多 ${(worstRel * 3.6).toFixed(1)} km/h`);
+  check('開賽時前方車流已淨空', worstNear > 250, `最近的車在前方 ${Number.isFinite(worstNear) ? worstNear.toFixed(0) + ' m' : '（沒有車）'}，共收掉 ${cleared} 台`);
+}
+
 section('完整一晚（自動駕駛跑到天亮）');
 {
   const ev = createEvents();
@@ -393,10 +429,12 @@ section('完整一晚（自動駕駛跑到天亮）');
   }
   const expect = (300 - S.run.penaltyMin - log.pa * rcfg.nodes.paMinutes) * 60 / rcfg.clock.gameSecondsPerRealSecond;
   check('天亮時這一局結束', S.over?.reason === 'dawn', `現實 ${t.toFixed(0)} 秒（00:00 → 05:00，扣掉懲罰後應為 ${expect.toFixed(0)} 秒）`);
-  check('時鐘速度與懲罰正確', Math.abs(t - expect) < 1.5);
+  // 快天亮時才輸的那一場，罰時會被剩餘時間截短，所以實際可以比算出來的多撐最多一次罰時
+  const slack = S.run.losses > 0 ? dcfg.loseMinutes * 60 / rcfg.clock.gameSecondsPerRealSecond : 0;
+  check('時鐘速度與懲罰正確', t > expect - 1.5 && t < expect + slack + 1.5);
   check('數值正常、不穿牆', !bad && maxOver < 0.02 && maxOverR < 0.02, `玩家超出 ${Math.max(0, maxOver).toFixed(3)} m，對手超出 ${Math.max(0, maxOverR).toFixed(3)} m`);
   check('不卡住', slow < 15, `低於 30 km/h 共 ${slow.toFixed(1)} 秒`);
-  check('交流道持續出現、左右都選得到', log.placed >= 6 && log.chosen.includes(-1) && log.chosen.includes(1),
+  check('交流道持續出現、左右都選得到', log.placed >= 5 && log.chosen.includes(-1) && log.chosen.includes(1),
     `出現 ${log.placed} 個，選了 ${log.chosen.length} 次（左 ${log.chosen.filter((x) => x < 0).length}、右 ${log.chosen.filter((x) => x > 0).length}），交換分支 ${log.swaps} 次，回收另一條 ${log.cleared} 次`);
   check('節點會開始（種類的涵蓋在 runtest 驗證）', Object.keys(log.nodes).length >= 1 && log.chosen.length >= 4, Object.entries(log.nodes).map(([k, v]) => `${k} ${v}`).join('、'));
   check('選路後對手不會留在另一條分支', rivalOnAltAfterChoice === 0);

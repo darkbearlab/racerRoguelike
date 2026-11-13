@@ -175,7 +175,7 @@ events.on('eventResult', (e) => hud.toast(
 events.on('rivalSkipped', () => hud.toast('對手離開了', 1.8));
 let approachMem = 0;
 events.on('duelCountdown', (e) => hud.countdown(String(e.count)));
-events.on('duelGo', () => hud.countdown('GO'));
+events.on('duelGo', () => hud.countdown('BATTLE'));
 events.on('duelZero', (e) => {
   hud.zero(e.who);
   if (e.who === 'player' && e.lost > 1) hud.toast(`被超車　分數歸零 −${Math.round(e.lost)}`, 1.6);
@@ -270,7 +270,6 @@ hud.title(!started);
 
 function step(dt) {
   if (paused || !started) return;
-  if (AUTOPILOT && duel.phase === 'marked') session.tryChallenge();
   if (AUTOPILOT) autoMenu();
   session.step(dt, playerInput());
 }
@@ -312,10 +311,7 @@ function render(alpha, dt) {
     hud.toast(VIEW_NAMES[v]);
   }
   if (edges.menu && menus.current && !paused) menus.input(edges.menu);
-  if (edges.flash) {
-    flash = 0.18;
-    if (!paused && !session.tryChallenge() && duel.phase === 'marked' && rival.active) hud.toast('太遠了：到對手後方 40 m 內再閃燈', 1.6);
-  }
+  if (edges.flash) flash = 0.18;   // 閃燈只是燈光效果；對決是靠近對手自動開始
   if (flash > 0) flash -= dt;
 
   const a = paused ? 1 : alpha;
@@ -389,7 +385,7 @@ function render(alpha, dt) {
   if (rival.active) {
     tagInfo.name = rival.def.name;
     tagInfo.ahead = rival.st.s - state.s;
-    tagInfo.canChallenge = duel.canChallenge(state, rival.st);
+    tagInfo.canChallenge = false;
     v3.copy(rPose.p).addScaledVector(rPose.u, 3.5).project(rig.camera);
     tagInfo.onScreen = v3.z < 1 && Math.abs(v3.x) < 0.96 && v3.y > -0.9 && v3.y < 0.96 && Math.abs(tagInfo.ahead) < 700;
     tagInfo.x = (v3.x * 0.5 + 0.5) * innerWidth;
@@ -463,7 +459,6 @@ window.__game = {
   advance(sec, inp, until) {
     const n = Math.round(sec * 60);
     for (let i = 0; i < n; i++) {
-      if (duel.phase === 'marked' && !inp) session.tryChallenge();
       if (!inp) autoMenu();
       session.step(1 / 60, inp || autopilot(state, playerCfg, road, autoOpts(), aiInput));
       streamer.update(state.s, null);
@@ -480,7 +475,6 @@ window.__game = {
     const t0 = performance.now();
     for (let i = 0; i < n; i++) {
       const f0 = performance.now();
-      if (duel.phase === 'marked') session.tryChallenge();
       autoMenu();
       session.step(1 / 60, autopilot(state, playerCfg, road, autoOpts(), aiInput));
       render(1, 1 / 60);
