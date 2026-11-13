@@ -15,7 +15,7 @@
   #rpm { width: 240px; height: 8px; margin-top: 10px; margin-left: auto; background: rgba(255,255,255,.14); border-radius: 4px; overflow: hidden; }
   #rpmFill { height: 100%; width: 0; background: linear-gradient(90deg, #6fd3ff 0%, #6fd3ff 70%, #ff5a3c 92%); }
   #drift { margin-top: 8px; font-size: 14px; letter-spacing: 3px; color: #ffb347; opacity: 0; transition: opacity .15s; }
-  #toast { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); font-size: 22px; letter-spacing: 4px;
+  #toast { position: absolute; top: calc(18% + var(--mh, 0px)); left: 50%; transform: translateX(-50%); font-size: 22px; letter-spacing: 4px;
            padding: 6px 18px; background: rgba(5,8,15,.55); border-radius: 4px; opacity: 0; transition: opacity .25s; }
   #help { position: absolute; left: 24px; bottom: 24px; font-size: 13px; line-height: 1.7; opacity: .75; text-shadow: 0 1px 4px #000; transition: opacity 1s; }
   #help b { display: inline-block; min-width: 86px; font-weight: 600; color: #9fd0ff; }
@@ -37,7 +37,7 @@
   #barP { color: #7fd0ff; } #barR { color: #ff8a6a; }
   .bar.zeroed .track { animation: zero .7s; }
   @keyframes zero { 0% { background: #fff; transform: scaleY(2.2); } 100% { background: rgba(255,255,255,.13); transform: none; } }
-  #gap { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); text-align: center; text-shadow: 0 2px 8px #000; }
+  #gap { position: absolute; top: calc(74px + var(--mh, 0px)); left: 50%; transform: translateX(-50%); text-align: center; text-shadow: 0 2px 8px #000; }
   #gapNum { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -1px; transition: text-shadow .2s, color .2s; }
   #gapNum small { font-size: 18px; margin-left: 3px; opacity: .7; }
   #gapNote { font-size: 12px; letter-spacing: 3px; opacity: .75; min-height: 16px; }
@@ -64,11 +64,11 @@
   #prompt kbd { font: inherit; font-weight: 700; padding: 0 8px; margin: 0 4px; border: 1px solid #ffe3a8; border-radius: 3px; }
   @keyframes blink { 50% { opacity: .55; } }
   /* ── 時鐘、選路、結算 */
-  #clock { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); text-align: center; text-shadow: 0 2px 8px #000; }
+  #clock { position: absolute; top: calc(10px + var(--mh, 0px)); left: 50%; transform: translateX(-50%); text-align: center; text-shadow: 0 2px 8px #000; }
   #clockTime { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 2px; }
   #clockLeft { font-size: 12px; letter-spacing: 2px; opacity: .75; }
   #clock.warn { color: #ff6a50; animation: blink 1s infinite; }
-  #jct { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); display: none; white-space: nowrap;
+  #jct { position: absolute; top: calc(24% + var(--mh, 0px)); left: 50%; transform: translateX(-50%); display: none; white-space: nowrap;
          background: rgba(6,60,34,.85); border: 2px solid #e8f0e8; border-radius: 5px; font-size: 20px; letter-spacing: 2px; }
   #jct span { display: inline-block; padding: 8px 20px; }
   #jct .pick { background: rgba(255,255,255,.22); }
@@ -130,6 +130,8 @@
   .r-rare .cmeta { color: #8cc4ff; opacity: 1; } .r-legendary .cmeta { color: #ffc86a; opacity: 1; }
   .cname { font-size: 20px; font-weight: 700; margin: 5px 0 6px; letter-spacing: 1px; }
   .cdesc { font-size: 14px; line-height: 1.45; opacity: .9; }
+  /* 畫面上方的後照鏡：影像由 WebGL 直接畫在這個框的位置，這裡只是外框 */
+  #mirrorFrame { position: absolute; display: none; box-sizing: border-box; border: 2px solid rgba(190,205,230,.75); border-radius: 6px; box-shadow: 0 2px 14px rgba(0,0,0,.7), inset 0 0 18px rgba(0,0,0,.55); pointer-events: none; }
   /* 開局選車：標題與按鈕收起來，三張車卡排在畫面下方，上面看得到正在預覽的車 */
   #carSelect { display: none; position: absolute; left: 0; right: 0; bottom: 5%; }
   .picking #carSelect { display: block; }
@@ -176,13 +178,14 @@
   <div id="banner"></div>
   <div id="clock"><div id="clockTime">00:00</div><div id="clockLeft"></div></div>
   <div id="jct"><span id="jctL"></span><span id="jctDist"></span><span id="jctR"></span></div>
+  <div id="mirrorFrame"></div>
   <div id="title">
     <h1>深夜高架</h1>
     <h2>ROGUELIKE</h2>
     <button class="tbtn sel" id="btnStart">開始<small>Enter</small></button>
     <button class="tbtn" id="btnSettings">設定<small>Tab</small></button>
     <div id="settings">
-      <label>後視鏡（駕駛艙視角）<input type="checkbox" id="optMirror"></label>
+      <label>後照鏡（畫面上方；會多畫一次場景）<input type="checkbox" id="optMirror"></label>
       <label>橡皮筋（對手落後時略為加速）<input type="checkbox" id="optRubber"></label>
       <label>高畫質光影（關閉可提升效能）<input type="checkbox" id="optGfx"></label>
       <label>濕路面反射（需開啟高畫質光影）<input type="checkbox" id="optWet"></label>

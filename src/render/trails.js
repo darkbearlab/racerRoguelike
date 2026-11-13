@@ -2,8 +2,8 @@ import * as THREE from 'three';
 
 // 尾燈光軌：每顆尾燈拖一條留在世界座標裡的光帶，愈舊愈淡。
 // 全部光帶合成一個幾何、一次 draw call；頂點座標以 anchor（玩家位置）為基準，開得再遠也不抖。
-const SEG = 14;          // 每條光帶的節點數
-const LIFE = 0.24;       // 光帶留存的秒數
+const SEG = 22;          // 每條光帶的節點數
+const LIFE = 0.6;        // 光帶留存的秒數（深夜賽車的味道：拖長一點）
 const STEP = LIFE / (SEG - 2);
 
 export function createTrails(scene, max = 84) {
@@ -32,7 +32,7 @@ export function createTrails(scene, max = 84) {
   mesh.renderOrder = 3;
   scene.add(mesh);
 
-  const tint = new THREE.Color(0.55, 0.02, 0.008);
+  const tint = new THREE.Color(1.0, 0.04, 0.016);
   let now = 0;
 
   return {
@@ -40,7 +40,7 @@ export function createTrails(scene, max = 84) {
     set enabled(v) { mesh.visible = v; },
     get enabled() { return mesh.visible; },
     /** HDR 開著時光帶本身就很亮，交給 bloom 暈開；沒開就用普通亮度 */
-    setHdr(on) { tint.setRGB(on ? 0.55 : 0.5, on ? 0.02 : 0.03, on ? 0.008 : 0.015); },
+    setHdr(on) { tint.setRGB(on ? 1.0 : 0.7, on ? 0.04 : 0.04, on ? 0.016 : 0.02); },
     /** 餵一顆尾燈這一幀的位置：p = 世界座標，w = 光帶半寬的向量，a = 亮度 0–1（0 = 不留新的光） */
     feed(id, x, y, z, hx, hy, hz, a) {
       if (!mesh.visible) return;
@@ -76,10 +76,11 @@ export function createTrails(scene, max = 84) {
           const o = b + ((h - kk) % SEG + SEG) % SEG;
           const age = k === 0 ? 0 : now - born[o];
           let f = c > 1 && k < c ? Math.max(0, 1 - age / LIFE) : 0;
-          f = f * f * f * amp[o];
+          const tw = 0.2 + 0.8 * f;   // 越舊越細：尾端收成一條線，不會像畫在地上的色帶
+          f = f * f * amp[o];
           const x = px[o] - ax, y = py[o] - ay, z = pz[o] - az;
-          pos[v] = x + wx[o]; pos[v + 1] = y + wy[o]; pos[v + 2] = z + wz[o];
-          pos[v + 3] = x - wx[o]; pos[v + 4] = y - wy[o]; pos[v + 5] = z - wz[o];
+          pos[v] = x + wx[o] * tw; pos[v + 1] = y + wy[o] * tw; pos[v + 2] = z + wz[o] * tw;
+          pos[v + 3] = x - wx[o] * tw; pos[v + 4] = y - wy[o] * tw; pos[v + 5] = z - wz[o] * tw;
           col[v] = col[v + 3] = tint.r * f; col[v + 1] = col[v + 4] = tint.g * f; col[v + 2] = col[v + 5] = tint.b * f;
         }
       }

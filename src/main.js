@@ -89,10 +89,10 @@ const applyGfx = () => {
 /** 一台車的兩顆尾燈各留一條光軌 */
 const v3t = new THREE.Vector3();
 function feedTrails(id, model, p, l, u, f, kmh, braking, gain = 1) {
-  const d = model.dims, a = Math.min(1, Math.max(0, (kmh - 50) / 60)) * (braking ? 1 : 0.6);
+  const d = model.dims, a = Math.min(1, Math.max(0, (kmh - 40) / 50)) * (braking ? 1 : 0.7);
   for (let k = 0; k < 2; k++) {
     v3t.copy(p).addScaledVector(l, (k === 0 ? 1 : -1) * d.W * 0.3).addScaledVector(u, d.tailY).addScaledVector(f, -d.L / 2 - 0.03);
-    trails.feed(id + k, v3t.x, v3t.y, v3t.z, l.x * 0.07, l.y * 0.07, l.z * 0.07, a * gain);
+    trails.feed(id + k, v3t.x, v3t.y, v3t.z, l.x * 0.085, l.y * 0.085, l.z * 0.085, a * gain);
   }
 }
 car = createCarModel({ spec: modelsJson[carCfg.model] || modelsJson.coupe, color: starter.color });
@@ -113,6 +113,44 @@ car.setView(rig.view);
 const mirrorRT = new THREE.WebGLRenderTarget(256, 64);
 const mirrorCam = new THREE.PerspectiveCamera(32, 4, 0.5, 900);
 car.mirror.material.map = mirrorRT.texture;
+// 畫面上方的後照鏡（追尾與車頭視角）：同一台後視攝影機畫到較寬的 render target，再貼到螢幕上方中央
+const topMirror = (() => {
+  const rt = new THREE.WebGLRenderTarget(640, 128);
+  const cam = new THREE.PerspectiveCamera(22, 5, 0.5, 900);
+  const quadScene = new THREE.Scene(), quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const mat = new THREE.ShaderMaterial({
+    depthTest: false, depthWrite: false,
+    uniforms: { tMap: { value: rt.texture }, uGray: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    // 左右相反（真的鏡子）、簡單的色調映射、四邊壓暗一點
+    fragmentShader: `uniform sampler2D tMap; uniform float uGray; varying vec2 vUv;
+      void main(){
+        vec3 c = texture2D(tMap, vec2(1.0 - vUv.x, vUv.y)).rgb * 1.5;
+        c = c / (1.0 + c * 0.6);
+        vec2 e = smoothstep(vec2(0.0), vec2(0.06, 0.22), vUv) * smoothstep(vec2(0.0), vec2(0.06, 0.22), 1.0 - vUv);
+        c *= 0.55 + 0.45 * e.x * e.y;
+        c = mix(c, vec3(dot(c, vec3(0.299, 0.587, 0.114))), uGray);
+        gl_FragColor = vec4(pow(c, vec3(1.0 / 2.2)), 1.0);
+      }`,
+  });
+  quadScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+  const frame = document.getElementById('mirrorFrame');
+  const rect = { x: 0, y: 0, w: 0, h: 0 };
+  let shown = null;
+  return {
+    rt, cam, quadScene, quadCam, mat, rect,
+    layout(on) {
+      const w = Math.round(Math.min(innerWidth * 0.28, 400)), h = Math.round(w / 5);
+      rect.w = w; rect.h = h; rect.x = Math.round((innerWidth - w) / 2); rect.y = 8;
+      if (on !== shown || frame.style.width !== `${w}px`) {
+        shown = on;
+        frame.style.display = on ? 'block' : 'none';
+        frame.style.left = `${rect.x}px`; frame.style.top = `${rect.y}px`; frame.style.width = `${w}px`; frame.style.height = `${h}px`;
+        document.documentElement.style.setProperty('--mh', on ? `${h + 10}px` : '0px');   // 時鐘等上方資訊往下讓位
+      }
+    },
+  };
+})();
 
 addEventListener('resize', () => resize(rig.camera));
 resize(rig.camera);
@@ -350,7 +388,7 @@ function computePose(s, d, psi, out, rd = road) {
   out.l.copy(R).multiplyScalar(-c).addScaledVector(T, -sn);
 }
 
-let gaugeTick = 0;
+let gaugeTick = 0, lastGray = 0;
 let debugTick = 0;
 const jctInfo = { left: null, right: null, dist: 0, side: 0 };
 const tagInfo = { active: false, onScreen: false, x: 0, y: 0, ahead: 0, name: '', canChallenge: false, threshold: 40 };
@@ -388,7 +426,7 @@ function render(alpha, dt) {
   car.group.matrix.copy(basis).setPosition(pose.p);
   car.group.matrixWorldNeedsUpdate = true;
   if (!paused) car.update(state, dt, flash);
-  if (!paused && rig.view === 'chase') feedTrails(TRAIL_PLAYER, car, pose.p, pose.l, pose.u, pose.f, Math.abs(state.vf) * 3.6, state.braking, 0.2);
+  if (!paused && rig.view === 'chase') feedTrails(TRAIL_PLAYER, car, pose.p, pose.l, pose.u, pose.f, Math.abs(state.vf) * 3.6, state.braking, 0.22);
 
   for (const e of pendingSparks) {
     v3.copy(pose.p).addScaledVector(pose.l, -e.side * 0.95).addScaledVector(pose.u, 0.35);
@@ -427,9 +465,40 @@ function render(alpha, dt) {
   }
 
   if (started && !paused) audio.update(dt, (AUTOPILOT ? aiInput : input.held).throttle);
+  // 三選一前的慢動作：時間越慢畫面越灰，選單開著時全灰；選完立刻恢復彩色
+  const gray = session.pendingChoice || (menus.current && menus.current.kind === 'choice') ? Math.min(1, Math.max(0, 1 - session.timeScale)) : 0;
+  if (gray !== lastGray) { lastGray = gray; canvas.style.filter = gray > 0.01 ? `grayscale(${gray.toFixed(2)})` : ''; }
+
+  // 後照鏡的影像要在主畫面之前畫好（主畫面畫完才貼上去）
+  const mirrorOn = !!camCfg.mirror && started && rig.view !== 'cockpit' && !session.over;
+  topMirror.layout(mirrorOn);
+  if (mirrorOn) {
+    const mc = topMirror.cam;
+    mc.position.copy(pose.p).addScaledVector(pose.u, 1.3).addScaledVector(pose.f, -2.4);
+    mc.up.copy(pose.u);
+    mc.lookAt(v3.copy(mc.position).addScaledVector(pose.f, -40).addScaledVector(pose.u, -1.2));
+    const wet = reflection.uniforms.uWet.value;
+    reflection.uniforms.uWet.value = 0;   // 路面倒影是照主攝影機算的，鏡子裡不能用
+    renderer.setRenderTarget(topMirror.rt);
+    renderer.render(scene, mc);
+    renderer.setRenderTarget(null);
+    reflection.uniforms.uWet.value = wet;
+  }
+
   { const k = Math.min(1, Math.max(0, (kmh - 90) / 130)); post.speed = paused || !started ? 0 : k * k * (3 - 2 * k); }
   reflection.render(scene, rig.camera, pose.p, pose.u);
   post.render(scene, rig.camera, dt);
+  if (mirrorOn) {
+    const r = topMirror.rect, auto = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.setViewport(r.x, innerHeight - r.y - r.h, r.w, r.h);
+    renderer.setScissor(r.x, innerHeight - r.y - r.h, r.w, r.h);
+    renderer.setScissorTest(true);
+    renderer.render(topMirror.quadScene, topMirror.quadCam);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, innerWidth, innerHeight);
+    renderer.autoClear = auto;
+  }
 
   // ── HUD
   hud.update(state, rig.view, dt);

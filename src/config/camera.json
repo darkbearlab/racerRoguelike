@@ -1,5 +1,5 @@
 {
-  "chase": { "back": 5.4, "height": 1.55, "lookAhead": 6, "fov": 62, "follow": 6, "speedBack": 1.3 },
+  "chase": { "back": 6.0, "height": 2.7, "lookAhead": 12, "fov": 62, "follow": 6, "speedBack": 1.3 },
   "hood": { "x": 0, "y": 1.0, "z": 2.3, "fov": 68 },
   "cockpit": { "x": -0.38, "y": 1.24, "z": -0.05, "fov": 66 },
   "speedFov": { "fromKmh": 60, "toKmh": 260, "add": 20 },
