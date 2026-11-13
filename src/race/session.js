@@ -14,7 +14,7 @@ import { JCT } from '../road/junction.js';
 import { createCarState, stepCar } from '../vehicle/physics.js';
 import { createTraffic } from '../vehicle/traffic.js';
 import { collidePlayerTraffic, collidePair } from '../vehicle/collide.js';
-import { createRival, spawnRival, updateRival } from '../vehicle/rival.js';
+import { createRival, spawnRival as placeRival, updateRival } from '../vehicle/rival.js';
 import { createDuel } from './duel.js';
 import { createClock } from './clock.js';
 import { NODE_TYPES, EVENT_NAMES, rollOptions, rollEvent } from './nodes.js';
@@ -106,6 +106,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
     cleared: 0,          // 這場對決開賽前收掉幾台車（除錯與測試用）
     applied: true,
     over: null,          // { reason: 'dawn' }
+    courier: false,      // 送貨事件：對手那台車現在是「要追上的目標」，不是對決
     pendingChoice: null, // 獲勝後等著開的三選一 { tier, t }：先顯示勝利，世界慢下來停住才出現
     resumeT: 1,          // 選完後世界恢復速度的進度 0–1
     timeScale: 1,        // 目前世界的時間倍率（給畫面與除錯用）
@@ -206,13 +207,13 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       const realDt = dt;
       let scale = 1;
       if (S.pendingChoice) {
-        const pc = S.pendingChoice, hold = runCfg?.choice?.holdSeconds ?? 1.2, ramp = runCfg?.choice?.slowSeconds ?? 1.5;
+        const pc = S.pendingChoice, hold = pc.hold ?? runCfg?.choice?.holdSeconds ?? 1.2, ramp = runCfg?.choice?.slowSeconds ?? 1.5;
         pc.t += dt;
         scale = pc.t < hold ? 1 : 1 - (pc.t - hold) / ramp;
         if (scale <= 0.04) {
           S.pendingChoice = null;
           S.timeScale = 0;
-          if (S.menus.openChoice(pc.tier)) { S.resumeT = 0; S.realTime += dt; return; }
+          if (pc.shop ? S.menus.openPa() : S.menus.openChoice(pc.tier)) { S.resumeT = 0; S.realTime += dt; return; }
           scale = 0.04;
         }
       } else if (S.resumeT < 1) {
@@ -299,6 +300,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
           player: playerProxy, phase: duel.phase, rubber: duelCfg.rubberBand, matchRange: duelCfg.matchRange, challengeRange: duelCfg.challengeRange, gridTarget,
           slip: !onAlt && traffic.slipstream(rs, rival.cfg.slipstreamRange, rival.cfg.slipstreamWidth, playerProxy),
           jctSide: f ? (flow.chosen ? f.side : state.d > 0 ? 1 : -1) : 0,
+          courier: S.courier,
         });
         if (gridTarget != null) { rs.vf += Math.min(16 * dt, Math.max(-16 * dt, gridTarget - rs.vf)); rival.proxy.v = rs.vf; }
       } else { rival.proxy.active = false; rival.proxy.onAlt = false; }
@@ -329,6 +331,9 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         }
         else {
           const lose = duelCfg.loseMinutesByTier?.[tier] ?? duelCfg.loseMinutes;
+          // 輸給警車：除了時間還要罰錢
+          const fine = Math.min(S.run.bounty, duelCfg.loseBountyByTier?.[tier] ?? 0);
+          S.run.bounty -= fine;
           S.run.losses++; S.run.penaltyMin += lose;
           if (clock) clock.spend(lose);
         }
@@ -379,6 +384,8 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
           emit('rivalSkipped', {});
           S.endNode();
         }
+      } else if (S.courier) {
+        // 送貨目標車：由事件流程管，不會自己離開
       } else if (duel.phase === 'idle' || duel.phase === 'result') {
         S.leaveT += dt;
         // 勝負一分出來這個節點就結束，下一個交流道馬上開始安排（不用等勝利字樣跑完）
@@ -393,16 +400,15 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       // ── 節點流程
       if (mode === 'run') {
         if (flow.phase === 'node' && flow.node === 'pa' && state.s >= flow.paAt) {
-          clock.spend(runCfg.nodes.paMinutes);
+          if (runCfg.nodes.paMinutes) clock.spend(runCfg.nodes.paMinutes);
           emit('pa', { minutes: runCfg.nodes.paMinutes });
           if (S.menus) {
-            // PA：開商店，離開後這個節點才結束
-            menuAi.cap = Math.min(40, Math.max(22, state.vf)); menuAi.mem.lane = Math.round(state.d / road.laneWidth + 1);
+            // PA：世界慢下來停住，用三選一的畫面買東西（時間或成長）；選完或離開後這個節點才結束
             flow.node = 'shop';
-            S.menus.openShop();
+            S.pendingChoice = { shop: true, t: 0, hold: 0.3 };
           } else S.endNode();
         }
-        if (flow.phase === 'node' && flow.node === 'shop' && !S.menus.current) {
+        if (flow.phase === 'node' && flow.node === 'shop' && !S.menus.current && !S.pendingChoice) {
           flow.node = 'pa';
           S.endNode();
         }
@@ -411,7 +417,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
           emit('shortcutDone', { minutes: runCfg.shortcut.refundMinutes });
           S.endNode();
         }
-        if (flow.phase === 'node' && flow.node === 'event') S.updateEvent();
+        if (flow.phase === 'node' && flow.node === 'event') S.updateEvent(dt);
         // 擊敗 Boss：等橫幅與三選一結束後進入下一晚（第三晚則通關）
         if (S.pendingNight && !(S.menus && S.menus.current) && duel.phase !== 'result') S.nextNight();
         // 另一條分支：玩家過分歧點一段距離後回收
@@ -446,7 +452,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         if (traffic.laneFree(l, sAt, -30, 40, null) && Math.abs(road.laneCenterAt(l, sAt) - state.d) > 2.5) { lane = l; break; }
       }
       if (lane < 0 || road.zoneAt(sAt) !== 0) return false;
-      spawnRival(rival, def, road, sAt, lane);
+      placeRival(rival, def, road, sAt, lane);
       rival.st.d = road.laneCenterAt(lane, sAt);
       rival.st.vf = Math.max(state.vf + 15, 45);
       rival.intro = true;
@@ -479,34 +485,89 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
     // ── 事件節點：塞車、警察盤查、神秘車輛
     startEvent(forkS) {
       const ec = runCfg.events;
-      const kind = rollEvent(flowRng, ec.weights);
+      const kind = S.forceEvent || rollEvent(flowRng, ec.weights);   // forceEvent：測試時指定事件種類
       const e = { kind, name: EVENT_NAMES[kind] };
       if (kind === 'jam') {
+        // 塞車：越快穿過去賞金越多，每撞一次扣一筆
         e.s0 = forkS + ec.jam.startAfterFork; e.s1 = e.s0 + ec.jam.length;
         e.cars = traffic.fillRange(e.s0, e.s1, ec.jam.cars, { kmhMin: ec.jam.kmhMin, kmhMax: ec.jam.kmhMax });
-      } else if (kind === 'police') {
-        e.checkS = forkS + ec.police.checkAfterFork; e.limit = ec.police.limitKmh;
+        e.entered = false; e.t = 0; e.hits = 0; e.hits0 = 0;
+      } else if (kind === 'police') flow.rivalPending = 'police';      // 盤查：和警車對決
+      else if (kind === 'delivery') {
+        // 送貨：一台車從後面靠上來並排，託你把東西交給前面開遠的那台車；越快追上獎勵越好
+        e.phase = 'ask'; e.t = 0; e.chaseT = 0; e.tries = 0; e.limit = ec.delivery.timeLimit;
+        const lane = Math.min(road.lanes - 1, Math.max(0, Math.round(state.d / road.laneWidth + 1)));
+        const side = lane === 0 ? 1 : lane === road.lanes - 1 ? lane - 1 : lane + (flowRng.next() < 0.5 ? -1 : 1);
+        e.helper = traffic.spawnCar(state.s - ec.delivery.helperBehind, side, state.vf * 3.6 + 28);
       } else flow.rivalPending = 'mystery';
       flow.event = e;
       emit('eventStart', e);
     },
-    updateEvent() {
+    updateEvent(dt) {
       const e = flow.event, ec = runCfg.events;
       if (!e || e.done) return;
-      if (e.kind === 'jam' && state.s >= e.s1 + 30) {
-        e.done = true;
-        S.run.bounty += ec.jam.bounty;
-        emit('eventResult', { kind: 'jam', bounty: ec.jam.bounty });
-        S.endNode();
-      } else if (e.kind === 'police' && state.s >= e.checkS) {
-        e.done = true;
-        const kmh = state.vf * 3.6;
-        const ok = kmh <= ec.police.limitKmh + ec.police.toleranceKmh;
-        if (ok) S.run.bounty += ec.police.bounty; else clock.spend(ec.police.fineMinutes);
-        emit('eventResult', { kind: 'police', ok, kmh, bounty: ok ? ec.police.bounty : 0, minutes: ok ? 0 : ec.police.fineMinutes });
-        S.endNode();
+      if (e.kind === 'jam') {
+        const j = ec.jam;
+        if (!e.entered && state.s >= e.s0) { e.entered = true; e.hits0 = state.carHits || 0; }
+        if (e.entered) { e.t += dt; e.hits = (state.carHits || 0) - e.hits0; }
+        if (state.s >= e.s1 + 30) {
+          e.done = true;
+          const fast = Math.min(1, Math.max(0, (j.slowSeconds - e.t) / (j.slowSeconds - j.parSeconds)));
+          const bounty = Math.max(0, Math.round((j.bounty + j.fastBonus * fast - j.hitPenalty * e.hits) / 10) * 10);
+          S.run.bounty += bounty;
+          emit('eventResult', { kind: 'jam', bounty, hits: e.hits, sec: e.t });
+          S.endNode();
+        }
+      } else if (e.kind === 'delivery') {
+        const dv = ec.delivery, h = e.helper;
+        e.t += dt;
+        if (e.phase === 'ask') {
+          // 委託車從後方追上來：跟玩家並排（或等太久）就算交代完了
+          if (h && h.active) h.cruise = Math.max(15, state.vf + 8);
+          if (!h || !h.active || h.s >= state.s - 2 || e.t > 7) {
+            e.phase = 'spawn'; e.t = 0;
+            emit('deliveryAsk', {});
+          }
+        } else {
+          // 委託車陪跑一下就放慢離開
+          if (h && h.active) h.cruise = e.t < 2.5 ? Math.max(15, state.vf) : 21;
+          if (e.phase === 'spawn') {
+            // 目標車放在前面遠處（找得到空位才放，不然下一步再試）
+            const def = rivals.find((r) => r.tier === 'courier');
+            const sAt = state.s + dv.spawnAhead + e.tries * 40;
+            e.tries++;
+            let lane = -1;
+            for (let k = 0; k < road.lanes; k++) if (traffic.laneFree(k, sAt, -30, 40, null)) { lane = k; break; }
+            if (def && !rival.active && lane >= 0 && sAt < road.sMax - 200 && road.zoneAt(sAt) === 0 && road.zoneAt(sAt + 200) === 0) {
+              placeRival(rival, def, road, sAt, lane);
+              rival.st.d = road.laneCenterAt(lane, sAt);
+              rival.proxy.active = true; rival.proxy.onAlt = false;
+              rival.proxy.s = sAt; rival.proxy.d = rival.st.d; rival.proxy.v = rival.st.vf;
+              S.courier = true; e.phase = 'chase'; e.chaseT = 0;
+              emit('courierSpawn', { def, ahead: sAt - state.s });
+            } else if (!def || e.tries > 300) { e.done = true; emit('eventResult', { kind: 'delivery', fail: true }); S.endNode(); }
+          } else if (e.phase === 'chase') {
+            e.chaseT += dt;
+            const ds = rival.st.s - state.s;
+            if (rival.active && ds < dv.catchRange) {
+              // 追到它旁邊（哪個車道都算）：交貨。越快等級越高，最快的那一級多一次三選一
+              const rw = dv.rewards.find((r) => e.chaseT <= r.sec) || dv.rewards[dv.rewards.length - 1];
+              e.done = true; S.courier = false;
+              S.run.bounty += rw.bounty;
+              if (rw.choice && S.menus) S.pendingChoice = { tier: 'normal', t: 0 };
+              emit('eventResult', { kind: 'delivery', bounty: rw.bounty, sec: e.chaseT, choice: !!rw.choice });
+              S.leaveT = 0;
+              S.endNode();
+            } else if (e.chaseT > dv.timeLimit || !rival.active) {
+              e.done = true; S.courier = false;
+              emit('eventResult', { kind: 'delivery', fail: true });
+              S.leaveT = 0;
+              S.endNode();
+            }
+          }
+        }
       }
-      // 神秘車輛：就是一場對決，結束時由對決流程收尾
+      // 警車、神秘車輛：就是一場對決，結束時由對決流程收尾
     },
 
     spawnRival(def, sAt) {
@@ -517,7 +578,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         if (traffic.laneFree(l, sAt, -30, 40, null)) { lane = l; break; }
       }
       if (lane < 0 || sAt > road.sMax - 200 || road.zoneAt(sAt) !== 0) return false;
-      spawnRival(rival, def, road, sAt, lane);
+      placeRival(rival, def, road, sAt, lane);
       rival.st.d = road.laneCenterAt(lane, sAt);
       rival.proxy.active = true; rival.proxy.onAlt = false;
       rival.proxy.s = sAt; rival.proxy.d = rival.st.d; rival.proxy.v = rival.st.vf;
@@ -535,7 +596,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   };
 
   if (upgrades) {
-    S.menus = createMenus({ upgrades, rng: menuRng, run: S.run, emit });
+    S.menus = createMenus({ upgrades, rng: menuRng, run: S.run, emit, pa: runCfg?.pa, onTime: (min) => { if (clock) clock.spend(-min); } });
     // 被超車時觸發的成長（例如賭徒：扣時間）
     ev.on('duelZero', (e) => {
       if (e.who !== 'player') return;

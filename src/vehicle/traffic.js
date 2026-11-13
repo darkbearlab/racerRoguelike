@@ -125,6 +125,14 @@ export function createTraffic(road, rng, cfg) {
     return placed;
   };
 
+  /** 在指定位置放一台車（事件用），回傳那台車；車道被佔就回傳 null */
+  api.spawnCar = (s, lane, kmh) => {
+    if (!spawnable(road, s) || !laneFree(lane, s, -12, 12, null)) return null;
+    const c = spawn(s, lane);
+    if (c) { c.cruise = kmh / 3.6; c.v = c.cruise; c.timer = 9999; }
+    return c;
+  };
+
   /** 開局時把玩家前方鋪滿 */
   api.populate = (player) => {
     const want = Math.round(cfg.densityPerKm * api.density * 1.0);

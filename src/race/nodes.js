@@ -9,7 +9,7 @@ export const NODE_TYPES = {
   boss: { icon: '♛', name: 'Boss', tier: 'boss' },
 };
 
-export const EVENT_NAMES = { jam: '塞車', police: '警察盤查', mystery: '神秘車輛' };
+export const EVENT_NAMES = { jam: '塞車', police: '警察盤查', mystery: '神秘車輛', delivery: '代送包裹' };
 
 const isDuel = (t) => t === 'rival' || t === 'elite';
 

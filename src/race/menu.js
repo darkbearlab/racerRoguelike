@@ -3,7 +3,7 @@
 //
 //   三選一：← 左卡、↑ 中卡、→ 右卡；↓ 都不要，改拿賞金
 //   商店：  ← → 移動游標、↑ 確認、↓ 離開（移除模式下 ↓ 是返回）
-export function createMenus({ upgrades, rng, run, emit }) {
+export function createMenus({ upgrades, rng, run, emit, pa, onTime }) {
   const rules = upgrades.rules;
   const M = {
     current: null,   // { kind: 'choice' | 'shop', ... }
@@ -20,6 +20,18 @@ export function createMenus({ upgrades, rng, run, emit }) {
       M.current = { kind: 'choice', tier, cards, timer: Infinity, total: Infinity, lock: rules.lockSeconds };
       M.version++;
       emit('menuOpen', { kind: 'choice' });
+      return true;
+    },
+
+    /** PA 休息站：和三選一同一個畫面，只是要用賞金買。第一張固定是買時間，另外兩張是隨機抽的成長 */
+    openPa() {
+      const mins = pa?.timeMinutes ?? 20;
+      const time = { id: '_time', time: mins, name: '補給休息', category: 'pa', rarity: 'common', desc: `天亮延後 ${mins} 分鐘` };
+      const cards = [time, ...upgrades.offer(rng, 'shop', 2)];
+      const prices = cards.map((d) => (d.time ? pa?.timePrice ?? 120 : upgrades.price(d)));
+      M.current = { kind: 'choice', shop: true, tier: 'shop', cards, prices, timer: Infinity, total: Infinity, lock: rules.lockSeconds, note: '' };
+      M.version++;
+      emit('menuOpen', { kind: 'pa' });
       return true;
     },
 
@@ -50,6 +62,18 @@ export function createMenus({ upgrades, rng, run, emit }) {
       const m = M.current;
       if (!m || m.lock > 0) return false;
       if (m.kind === 'choice') {
+        if (m.shop) {
+          if (dir === 'down') { M.close('left'); return true; }
+          const k = dir === 'left' ? 0 : dir === 'up' ? 1 : dir === 'right' ? 2 : -1;
+          if (k < 0 || k >= m.cards.length) return false;
+          const d = m.cards[k], price = m.prices[k];
+          if (run.bounty < price) { m.note = '賞金不足'; M.version++; return false; }
+          run.bounty -= price;
+          if (d.time) { if (onTime) onTime(d.time); emit('timeBought', { minutes: d.time, price }); }
+          else { upgrades.add(d.id); emit('upgradeGained', { def: d, from: 'shop', price }); }
+          M.close('picked');
+          return true;
+        }
         if (dir === 'down') {
           // 都不要：改拿賞金
           run.bounty += rules.skipBounty;

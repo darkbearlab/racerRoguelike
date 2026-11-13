@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createCarState, stepCar } from '../src/vehicle/physics.js';
 import { createEvents } from '../src/core/events.js';
 import { createSession } from '../src/race/session.js';
+import { autopilot, createAiMemory } from '../src/vehicle/ai.js';
 
 const load = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), 'utf8'));
 const cfg = load('../src/config/cars.json').player;
@@ -231,54 +232,105 @@ section('三選一');
   check('強敵獲勝：選項一定含稀有以上', rareOk === 200, `200 次抽選；稀有以上平均張數 強敵 ${(eliteRare / 200).toFixed(2)}、一般 ${(normRare / 200).toFixed(2)}`);
 }
 
-section('PA 商店');
+section('PA 休息站（三選一：買時間或買成長）');
 {
   const S = session([], { mode: 'run' });
   S.run.bounty = 300;
-  S.upgrades.add('turbo');
-  S.menus.openShop();
-  const m = S.menus.current;
+  S.menus.openPa();
+  let m = S.menus.current;
   for (let i = 0; i < 40; i++) S.menus.update(DT);
-  check('商店有三件商品與價格', m.kind === 'shop' && m.stock.length === 3 && m.stock.every((it) => it.price === ucfg.rules.prices[it.def.rarity]),
-    m.stock.map((it) => `${it.def.name} ${it.price}`).join('、'));
-  const it = m.stock[0];
-  S.menus.input('up');
-  check('用賞金購買：扣款並立刻生效', it.sold && S.run.bounty === 300 - it.price && S.upgrades.count(it.def.id) >= 1, `${it.def.name}，賞金 300 → ${S.run.bounty}`);
-  S.menus.input('up');
-  check('同一件不能買兩次', S.run.bounty === 300 - it.price && m.note === '已售出');
-  S.run.bounty = 10;
-  S.menus.input('right'); S.menus.input('up');
-  check('賞金不足不能買', S.run.bounty === 10 && !m.stock[1].sold && m.note === '賞金不足');
-  S.menus.input('right'); S.menus.input('right'); // 游標到「移除」
-  const before = S.upgrades.total;
-  S.menus.input('up');
-  check('進入移除模式', m.mode === 'remove');
-  const victim = S.upgrades.list()[m.rcursor].def;
-  S.menus.input('up');
-  check('移除一個成長', S.upgrades.total === before - 1 && m.mode === 'buy' && m.removed, `移除 ${victim.name}`);
-  S.menus.input('up');
-  check('每次進站只能移除一個', m.mode === 'buy' && S.upgrades.total === before - 1);
-  S.menus.input('down');
-  check('↓ 離開商店', !S.menus.current);
+  check('三張卡：第一張買時間，另外兩張是成長，都有價格', m.kind === 'choice' && m.shop && m.cards.length === 3 && !!m.cards[0].time
+    && m.prices[0] === rcfg.pa.timePrice && m.prices.slice(1).every((p, k) => p === ucfg.rules.prices[m.cards[k + 1].rarity]),
+    m.cards.map((d, k) => `${d.name} ${m.prices[k]}`).join('、'));
+  const min0 = S.clock.minute;
+  S.clock.spend(60);
+  const before = S.clock.minute;
+  check('← 買時間：扣賞金、時鐘倒退', S.menus.input('left') && !S.menus.current && S.run.bounty === 300 - rcfg.pa.timePrice && near(before - S.clock.minute, rcfg.pa.timeMinutes, 0.01),
+    `賞金 300 → ${S.run.bounty}，時鐘 −${(before - S.clock.minute).toFixed(0)} 分鐘`);
+  void min0;
 
-  // 走完整流程：選 PA 分支 → 扣 20 分鐘 → 開商店 → 離開後節點結束、下一個交流道出現
+  S.run.bounty = 400;
+  S.menus.openPa(); m = S.menus.current;
+  for (let i = 0; i < 40; i++) S.menus.update(DT);
+  const want = m.cards[1], price = m.prices[1];
+  check('↑ 買成長：扣賞金並立刻生效', S.menus.input('up') && !S.menus.current && S.run.bounty === 400 - price && S.upgrades.count(want.id) === 1, `${want.name}，賞金 400 → ${S.run.bounty}`);
+
+  S.run.bounty = 10;
+  S.menus.openPa(); m = S.menus.current;
+  for (let i = 0; i < 40; i++) S.menus.update(DT);
+  const tot = S.upgrades.total;
+  check('賞金不足不能買，選單留著', S.menus.input('left') === false && S.menus.input('right') === false && !!S.menus.current && S.run.bounty === 10 && S.upgrades.total === tot && m.note === '賞金不足');
+  check('↓ 不買直接離開（不給賞金）', S.menus.input('down') && !S.menus.current && S.run.bounty === 10);
+
+  // 走完整流程：選 PA 分支 → 世界慢下來停住 → 三選一 → 離開後節點結束、下一個交流道出現
   const R = session([], { mode: 'run' });
   R.flow.options = ['pa', 'pa'];
   const st = R.state, fS = R.flow.forkS;
   st.s = fS - 100; st.vf = 40; R.prev.s = st.s;
-  let opened = false, minAtOpen = 0, m0 = 0;
-  for (let i = 0; i < 60 * 60 && !opened; i++) {
-    m0 = R.clock.minute;
-    R.step(DT, { throttle: 0.5, brake: 0, steer: 0 });
-    if (R.menus.current) { opened = true; minAtOpen = R.clock.minute - m0; }
-  }
-  check('進 PA 扣 20 分鐘並開啟商店', opened && R.menus.current.kind === 'shop' && near(minAtOpen, rcfg.nodes.paMinutes, 0.05), `過分歧點後 ${(st.s - fS).toFixed(0)} m`);
+  const minBefore = R.clock.minute;
+  let opened = false, tReal = 0;
+  for (let i = 0; i < 60 * 60 && !opened; i++) { R.step(DT, { throttle: 0.5, brake: 0, steer: 0 }); tReal += DT; if (R.menus.current) opened = true; }
+  check('進 PA：不扣時間，停住後開啟三選一', opened && R.menus.current.shop && R.timeScale === 0 && R.clock.minute - minBefore < tReal * 25 / 60 + 0.01, `過分歧點後 ${(st.s - fS).toFixed(0)} m`);
   const placed0 = R.flow.forkS;
   for (let i = 0; i < 60; i++) R.step(DT, { throttle: 0, brake: 0, steer: 0 });
   R.menus.input('down');
-  for (let i = 0; i < 30; i++) R.step(DT, { throttle: 0.5, brake: 0, steer: 0 });
-  check('離開商店後節點結束，下一個交流道出現', R.flow.phase === 'approach' && R.flow.forkS > placed0, `下一個分歧點在 ${(R.flow.forkS - st.s).toFixed(0)} m 外`);
+  for (let i = 0; i < 60; i++) R.step(DT, { throttle: 0.5, brake: 0, steer: 0 });
+  check('離開後節點結束，下一個交流道出現', R.flow.phase === 'approach' && R.flow.forkS > placed0, `下一個分歧點在 ${(R.flow.forkS - st.s).toFixed(0)} m 外`);
 }
 
+section('事件：警車、塞車、送貨');
+{
+  /** 開一局並指定事件種類 */
+  const ev = (kind, seed = 3) => {
+    const E = session([], { mode: 'run', seed });
+    E.flow.options = ['event', 'event'];
+    const fS = E.flow.forkS;
+    E.state.s = fS - 100; E.state.vf = 40; E.prev.s = E.state.s;
+    const out = { E, results: [], fS };
+    E.ev.on('eventResult', (r) => out.results.push(r));
+    E.forceEvent = kind;
+    return out;
+  };
+  const inp = {}, mem = createAiMemory();
+  const drive = (E, sec, until) => { let t = 0; while (t < sec && !(until && until())) { if (E.menus.current && E.menus.current.lock <= 0) E.menus.input('left'); autopilot(E.state, E.playerCfg, E.road, { traffic: E.obsForPlayer, mem, dt: DT, line: true, caution: 0.85, margin: 1.25 }, inp); E.step(DT, inp); t += DT; } return t; };
+
+  // 警車：一場對決，贏了獎金比一般多；輸了罰錢又罰時間
+  {
+    const { E } = ev('police');
+    drive(E, 60, () => E.rival.active);
+    check('盤查：出現的是警車，進入對決流程', E.rival.active && E.rival.def.tier === 'police' && E.duel.phase !== 'idle', E.rival.def?.name);
+    drive(E, 60, () => E.duel.phase === 'racing');
+    const b0 = E.run.bounty;
+    E.duel.finish(true, 'score'); E.step(DT, inp);
+    check('贏警車：賞金比一般對決多', E.run.bounty - b0 === dcfg.bountyByTier.police && dcfg.bountyByTier.police > dcfg.bountyByTier.normal, `+${E.run.bounty - b0}（一般 +${dcfg.bountyByTier.normal}）`);
+    const L = ev('police', 4).E;
+    drive(L, 60, () => L.rival.active); drive(L, 60, () => L.duel.phase === 'racing');
+    L.run.bounty = 200; const m0 = L.clock.minute;
+    L.duel.finish(false, 'score'); L.step(DT, inp);
+    check('輸警車：罰金加罰時間', L.run.bounty === 200 - dcfg.loseBountyByTier.police && near(L.clock.minute - m0, dcfg.loseMinutesByTier.police, 0.1), `賞金 200 → ${L.run.bounty}，時鐘 +${(L.clock.minute - m0).toFixed(0)} 分鐘`);
+  }
+  // 塞車：越快越多，撞到會扣
+  {
+    const a = ev('jam');
+    drive(a.E, 120, () => a.results.length > 0);
+    const r = a.results[0], j = rcfg.events.jam;
+    check('塞車：穿過後依時間與碰撞次數給賞金', !!r && r.kind === 'jam' && r.bounty >= 0 && r.bounty <= j.bounty + j.fastBonus && r.bounty === Math.max(0, Math.round((j.bounty + j.fastBonus * Math.min(1, Math.max(0, (j.slowSeconds - r.sec) / (j.slowSeconds - j.parSeconds))) - j.hitPenalty * r.hits) / 10) * 10),
+      r ? `${r.sec.toFixed(0)} 秒、碰撞 ${r.hits} 次 → +${r.bounty}` : '沒有結果');
+  }
+  // 送貨：委託車靠上來 → 目標車出現在前方 → 追上並排就完成
+  {
+    const d = ev('delivery');
+    let asked = false; d.E.ev.on('deliveryAsk', () => { asked = true; });
+    drive(d.E, 40, () => d.E.courier);
+    const ahead = d.E.rival.st.s - d.E.state.s;
+    check('送貨：委託後目標車出現在前方遠處，不是對決', asked && d.E.courier && d.E.rival.def.tier === 'courier' && d.E.duel.phase === 'idle' && ahead > 300 && ahead < 800, `前方 ${ahead.toFixed(0)} m`);
+    const t = drive(d.E, 120, () => d.results.length > 0);
+    const r = d.results[0];
+    check('送貨：追上並排就送達，越快獎勵越好', !!r && !r.fail && r.bounty > 0 && !d.E.courier && rcfg.events.delivery.rewards[0].bounty > rcfg.events.delivery.rewards[1].bounty, r && !r.fail ? `${r.sec.toFixed(0)} 秒 → +${r.bounty}${r.choice ? '＋三選一' : ''}` : `${t.toFixed(0)} 秒內沒追上`);
+    const nodes0 = d.E.flow.nodesDone;
+    drive(d.E, 25);
+    check('送達後節點結束、目標車離開', nodes0 >= 1 && !d.E.courier && (!d.E.rival.active || d.E.rival.mode === 'leave'), d.E.rival.active ? '目標車減速靠邊中' : '目標車已離開');
+  }
+}
 console.log(failed ? `\n${failed} 項失敗` : '\n成長系統全部通過');
 process.exit(failed ? 1 : 0);

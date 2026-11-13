@@ -64,7 +64,11 @@ export function updateRival(r, dt, ctx) {
     line: false, preferD: null, speedCap: undefined,
   };
 
-  if (r.intro) {
+  if (ctx.courier) {
+    // 送貨事件的目標車：不比賽，照巡航速度一直往前開，等玩家追上
+    r.mode = 'courier';
+    o.speedCap = def.cruiseKmh / 3.6;
+  } else if (r.intro) {
     // Boss 登場：開遠光燈從後方高速逼近，超到玩家前方後才進入等待挑戰
     // 登場時不受自己的極速限制，玩家開再快也追得上來
     o.speedCap = Math.max(player.v + 24, 52);

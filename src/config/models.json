@@ -34,6 +34,17 @@
     "extras": { "spoiler": "duck", "lip": true, "exhaust": "twin", "grille": "wide" }
   },
 
+  "police": {
+    "label": "高速巡邏車",
+    "L": 4.7, "W": 1.72, "H": 1.42, "wb": 2.7, "fo": 0.88, "clearance": 0.17, "wheelR": 0.3, "wheelW": 0.22,
+    "nose": { "h": 0.74, "drop": 0.05, "taper": 0.97 }, "cowlH": 0.97, "cowl": 0.5,
+    "beltH": 0.98, "deck": { "h": 0.98, "len": 1.04 }, "tail": { "h": 0.96, "drop": 0.04, "taper": 0.97 },
+    "cabin": { "wsRake": 38, "rearRake": 42, "cPillar": 0.3, "tumble": 0.2 },
+    "tumble": 0.03, "crown": 0.07, "bumperDark": true,
+    "lights": { "head": "quad", "tail": "rect" },
+    "extras": { "lip": true, "exhaust": "twin", "grille": "wide", "roofLight": true }
+  },
+
   "wedge": {
     "label": "楔形中置引擎跑車",
     "L": 4.2, "W": 1.74, "H": 1.19, "wb": 2.42, "fo": 1.0, "clearance": 0.13, "wheelR": 0.305, "wheelW": 0.25,

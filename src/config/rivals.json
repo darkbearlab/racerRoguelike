@@ -66,6 +66,16 @@
       "cornerSkill": 0.9, "aggression": 0.9, "block": 0.3, "mistake": 0.15
     },
     {
+      "id": "patrol", "model": "police", "name": "高速巡邏車", "tier": "police", "color": "#f2f2f0",
+      "topSpeedKmh": 198, "power": 4.6, "cruiseKmh": 122,
+      "cornerSkill": 0.86, "aggression": 1.0, "block": 0.9, "mistake": 0.08
+    },
+    {
+      "id": "courier", "model": "wagon", "name": "白色旅行車", "tier": "courier", "color": "#ecece6",
+      "topSpeedKmh": 170, "power": 4.0, "cruiseKmh": 110,
+      "cornerSkill": 0.6, "aggression": 0.3, "block": 0, "mistake": 0
+    },
+    {
       "id": "yasha", "model": "bossCorner", "name": "夜叉", "title": "彎道之王", "tier": "boss", "color": "#b01030",
       "topSpeedKmh": 202, "power": 4.6, "cruiseKmh": 125,
       "cornerSkill": 1.0, "aggression": 0.9, "block": 0.45, "mistake": 0,

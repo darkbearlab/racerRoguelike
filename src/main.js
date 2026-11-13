@@ -166,7 +166,8 @@ events.on('jctPlaced', placeSigns);
 events.on('forkSwap', (e) => streamer.onSwap(e.forkS));
 events.on('altCleared', () => streamer.onAltCleared());
 events.on('forkChosen', (e) => hud.toast(`${NODE_TYPES[e.node].icon} ${NODE_TYPES[e.node].name}`, 2.2));
-events.on('pa', (e) => hud.toast(`⛽ PA 休息站　−${e.minutes} 分鐘`, 2.2));
+events.on('pa', () => hud.toast('⛽ PA 休息站', 1.6));
+events.on('timeBought', (e) => hud.toast(`補給完成　天亮延後 ${e.minutes} 分鐘`, 2.2));
 events.on('upgradeGained', (e) => hud.toast(`獲得成長：${e.def.name}`, 2));
 events.on('upgradeRemoved', (e) => hud.toast(`移除成長：${e.def.name}`, 2));
 events.on('menuSkipped', (e) => hud.toast(e.empty ? `沒有成長可拿了　賞金 +${e.bounty}` : `未選擇　賞金 +${e.bounty}`, 2));
@@ -198,7 +199,7 @@ events.on('carHit', (e) => {
 });
 events.on('rivalMarked', (e) => {
   rivalCar.setSpec(modelsJson[e.def.model] || modelsJson.hatch, e.def.color);
-  rivalCar.marker.material.color.setRGB(3.2, 0.5, 0.25);
+  if (e.def.tier === 'police') rivalCar.marker.material.color.setRGB(0.5, 1.0, 3.4); else rivalCar.marker.material.color.setRGB(3.2, 0.5, 0.25);
   hud.toast(`對手出現：${e.def.name}`, 2.2);
 });
 events.on('bossIntro', (e) => {
@@ -211,10 +212,19 @@ events.on('duelApplied', (e) => {
 });
 events.on('nightStart', (e) => hud.night(e.night, e.zone.name));
 events.on('shortcutDone', (e) => hud.toast(`↪ 捷徑完成　退回 ${e.minutes} 分鐘`, 2.4));
-events.on('eventStart', (e) => hud.toast(e.kind === 'jam' ? '❓ 前方塞車　穿過去有賞金' : e.kind === 'police' ? `❓ 前方警察盤查　限速 ${e.limit} km/h` : '❓ 有輛來路不明的車…', 3));
+events.on('eventStart', (e) => hud.toast(
+  e.kind === 'jam' ? '❓ 前方塞車　越快穿過賞金越多，撞到會扣'
+    : e.kind === 'police' ? '🚨 被巡邏車盯上了　甩掉它'
+      : e.kind === 'delivery' ? '❓ 後面有台車靠過來了…' : '❓ 有輛來路不明的車…', 3));
+events.on('deliveryAsk', () => hud.toast('「幫我把這個交給前面那台白色旅行車！」', 3.2));
+events.on('courierSpawn', (e) => {
+  rivalCar.setSpec(modelsJson[e.def.model] || modelsJson.wagon, e.def.color);
+  rivalCar.marker.material.color.setRGB(0.6, 2.6, 1.2);   // 目標車的標記是綠色
+});
 events.on('eventResult', (e) => hud.toast(
-  e.kind === 'jam' ? `穿過塞車　賞金 +${e.bounty}`
-    : e.ok ? `通過盤查　賞金 +${e.bounty}` : `超速 ${Math.round(e.kmh)} km/h　−${e.minutes} 分鐘`, 2.6));
+  e.kind === 'jam' ? `穿過塞車　${e.sec.toFixed(0)} 秒、碰撞 ${e.hits} 次　賞金 +${e.bounty}`
+    : e.fail ? '沒追上，包裹送不到了'
+      : `送達　${e.sec.toFixed(0)} 秒　賞金 +${e.bounty}${e.choice ? '　再加一次成長' : ''}`, 3));
 events.on('rivalSkipped', () => hud.toast('對手離開了', 1.8));
 let approachMem = 0;
 events.on('duelCountdown', (e) => hud.countdown(String(e.count)));
@@ -226,7 +236,8 @@ events.on('duelZero', (e) => {
 });
 events.on('duelEnd', (e) => {
   const tier = rival.def?.tier || 'normal';
-  hud.banner(e.win, e.reason, e.win ? `賞金 +${duelCfg.bountyByTier?.[tier] ?? duelCfg.bounty}` : `−${duelCfg.loseMinutesByTier?.[tier] ?? duelCfg.loseMinutes} 分鐘`);
+  const fine = duelCfg.loseBountyByTier?.[tier];
+  hud.banner(e.win, e.reason, e.win ? `賞金 +${duelCfg.bountyByTier?.[tier] ?? duelCfg.bounty}` : `−${duelCfg.loseMinutesByTier?.[tier] ?? duelCfg.loseMinutes} 分鐘${fine ? `　罰金 ${fine}` : ''}`);
 });
 
 // 自動駕駛選路：優先選對決節點
@@ -247,6 +258,7 @@ const playerInput = () => (AUTOPILOT ? autopilot(state, playerCfg, road, autoOpt
 function autoMenu() {
   const m = menus.current;
   if (!m || m.lock > 0) return;
+  if (m.kind === 'choice' && m.shop) { const k = m.prices.findIndex((p) => session.run.bounty >= p); menus.input(k < 0 ? 'down' : ['left', 'up', 'right'][k]); return; }
   if (m.kind === 'choice') { menus.input('left'); return; }
   const i = m.stock.findIndex((it) => !it.sold && session.run.bounty >= it.price && upgrades.canTake(it.def));
   if (i < 0) { menus.input('down'); return; }
@@ -417,7 +429,7 @@ function render(alpha, dt) {
     rivalCar.group.visible = true;
     if (!paused) rivalCar.update(rs, dt, rival.flash);
     if (!paused) feedTrails(TRAIL_RIVAL, rivalCar, rPose.p, rPose.l, rPose.u, rPose.f, Math.abs(rs.vf) * 3.6, rs.braking);
-    rivalCar.setMarker(duel.phase === 'marked' || duel.phase === 'countdown' || duel.phase === 'racing', dt);
+    rivalCar.setMarker(session.courier || duel.phase === 'marked' || duel.phase === 'countdown' || duel.phase === 'racing', dt);
   } else rivalCar.group.visible = false;
 
   computePose(prev.s + (state.s - prev.s) * a, prev.d + (state.d - prev.d) * a, lerpAngle(prev.psi, state.psi, a), pose);
@@ -503,6 +515,7 @@ function render(alpha, dt) {
   // ── HUD
   hud.update(state, rig.view, dt);
   tagInfo.active = rival.active;
+  tagInfo.courier = session.courier;
   tagInfo.threshold = duel.mods.threshold;
   if (rival.active) {
     tagInfo.name = rival.def.name;
@@ -520,8 +533,8 @@ function render(alpha, dt) {
   else if (flow.phase === 'node' && flow.node === 'event' && flow.event && !flow.event.done) {
     const ev = flow.event;
     nodeLabel = `❓ ${ev.name}`;
-    if (ev.kind === 'police') nodeLabel += `　限速 ${ev.limit} km/h　${Math.max(0, Math.round((ev.checkS - state.s) / 10) * 10)} m`;
-    else if (ev.kind === 'jam') nodeLabel += `　還有 ${Math.max(0, Math.round((ev.s1 - state.s) / 10) * 10)} m`;
+    if (ev.kind === 'jam') nodeLabel += ev.entered ? `　${ev.t.toFixed(0)} 秒　碰撞 ${ev.hits}　還有 ${Math.max(0, Math.round((ev.s1 - state.s) / 10) * 10)} m` : `　前方 ${Math.max(0, Math.round((ev.s0 - state.s) / 10) * 10)} m`;
+    else if (ev.kind === 'delivery' && ev.phase === 'chase') nodeLabel += `　${ev.chaseT.toFixed(0)} 秒　剩 ${Math.max(0, ev.limit - ev.chaseT).toFixed(0)} 秒`;
   }
   hud.run(session.run, nodeLabel, session.nights ? { night: session.run.night, zoneName: session.zoneName, need: runCfg.boss.afterDefeats } : null);
   hud.clock(clock);

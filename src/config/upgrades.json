@@ -10,10 +10,11 @@
       "normal": { "common": 70, "rare": 25, "legendary": 5 },
       "elite": { "common": 35, "rare": 48, "legendary": 17 },
       "mystery": { "common": 20, "rare": 55, "legendary": 25 },
+      "police": { "common": 30, "rare": 50, "legendary": 20 },
       "boss": { "common": 15, "rare": 50, "legendary": 35 },
       "shop": { "common": 50, "rare": 38, "legendary": 12 }
     },
-    "guaranteeRareFor": ["elite", "mystery", "boss"]
+    "guaranteeRareFor": ["elite", "mystery", "police", "boss"]
   },
   "list": [
     {

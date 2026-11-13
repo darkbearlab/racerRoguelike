@@ -77,13 +77,13 @@ export function createHud(debugOn) {
       }
 
       // 對手標籤：在畫面內就貼在車上，不在畫面內就顯示方向與距離
-      const showTag = info.active && d.phase !== 'idle';
+      const showTag = info.active && (d.phase !== 'idle' || info.courier);
       if (showTag && info.onScreen) {
         tag.style.display = 'block';
         tag.style.left = `${info.x.toFixed(0)}px`;
         tag.style.top = `${info.y.toFixed(0)}px`;
         set('tagName', tagName, 'text', info.name);
-        set('tagDist', tagDist, 'text', d.phase === 'marked' ? `${Math.max(0, Math.round(info.ahead))} m` : '');
+        set('tagDist', tagDist, 'text', d.phase === 'marked' || info.courier ? `${Math.max(0, Math.round(info.ahead))} m` : '');
         set('edge', edge, 'display', 'none');
       } else {
         tag.style.display = 'none';

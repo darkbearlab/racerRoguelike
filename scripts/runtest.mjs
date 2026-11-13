@@ -67,9 +67,9 @@ function play(seed, { forceWin, forceLose, maxSeconds = 3600, runOverride, duelO
     }
     if (!approaching) side = 0;
     autopilot(st, S.playerCfg, S.road, { traffic: S.obsForPlayer, mem, dt: DT, line: !approaching, caution: 0.85, margin: 1.25, preferD: approaching ? side * 4.6 : null }, inp);
-    // 選單：三選一拿第一張，商店直接離開
+    // 選單：三選一拿第一張，PA 直接離開
     const m = S.menus.current;
-    if (m && m.lock <= 0) S.menus.input(m.kind === 'choice' ? 'left' : 'down');
+    if (m && m.lock <= 0) S.menus.input(m.kind === 'choice' && !m.shop ? 'left' : 'down');
     if (S.duel.phase === 'marked') S.tryChallenge();
     if (S.duel.phase === 'racing') {
       duelT += DT;
@@ -204,27 +204,15 @@ section('極速怪物的氮氣（第二晚 Boss 對決 90 秒）');
 
 section('事件節點');
 {
-  // 警察盤查：低於限速拿賞金、超速扣時間
-  const police = (kmh) => {
-    const { S, ev } = make(9, { events: { ...rcfg.events, weights: { police: 1 } } });
-    let res = null;
-    ev.on('eventResult', (e) => { res = e; });
-    S.flow.options = ['event', 'event'];
-    const st = S.state, fS = S.flow.forkS;
-    st.s = fS - 60; st.vf = kmh / 3.6; S.prev.s = st.s;
-    const b0 = S.run.bounty;
-    let m0 = 0;
-    for (let i = 0; i < 60 * 60 && !res; i++) {
-      m0 = S.clock.minute;
-      st.vf = kmh / 3.6;
-      S.step(DT, { throttle: 0.3, brake: 0, steer: 0 });
-    }
-    return { res, bounty: S.run.bounty - b0, minutes: S.clock.minute - m0, phase: S.flow.phase };
-  };
-  const slow = police(90), fast = police(160);
-  check('警察盤查：守速限拿賞金', slow.res?.ok && slow.bounty === rcfg.events.police.bounty, `時速 90：賞金 +${slow.bounty}`);
-  check('警察盤查：超速扣時間', fast.res && !fast.res.ok && Math.abs(fast.minutes - rcfg.events.police.fineMinutes) < 0.05, `時速 160：時鐘 +${fast.minutes.toFixed(0)} 分鐘`);
-
+  // 警察盤查：出現警車、是一場對決（獎懲在 upgradetest 驗證）
+  {
+    const { S: P } = make(9, { events: { ...rcfg.events, weights: { police: 1 } } });
+    P.flow.options = ['event', 'event'];
+    P.state.s = P.flow.forkS - 80; P.state.vf = 40; P.prev.s = P.state.s;
+    const inpP = {}, memP = createAiMemory();
+    for (let i = 0; i < 60 * 40 && !P.rival.active; i++) { autopilot(P.state, P.playerCfg, P.road, { traffic: P.obsForPlayer, mem: memP, dt: DT }, inpP); P.step(DT, inpP); }
+    check('警察盤查：出現警車，是一場對決', P.rival.active && P.rival.def.tier === 'police' && P.duel.target === dcfg.targets.police, P.rival.active ? `${P.rival.def.name}，目標 ${P.duel.target} 分` : '');
+  }
   // 塞車：真的有一段密集慢車
   const { S, ev } = make(21, { events: { ...rcfg.events, weights: { jam: 1 } } });
   let started = null, result = null;
@@ -240,7 +228,7 @@ section('事件節點');
     t += DT;
     if (started && st.s > started.s0 && st.s < started.s1) { inJam += st.vf; n++; minV = Math.min(minV, st.vf); }
   }
-  check('塞車：一段密集慢車，穿過後拿賞金', !!started && started.cars >= 16 && !!result && result.bounty === rcfg.events.jam.bounty,
+  check('塞車：一段密集慢車，穿過後拿賞金', !!started && started.cars >= 16 && !!result && result.bounty >= 0 && result.bounty <= rcfg.events.jam.bounty + rcfg.events.jam.fastBonus,
     started ? `${started.cars} 台慢車擠在 ${rcfg.events.jam.length} m 內；通過時平均 ${((inJam / Math.max(1, n)) * 3.6).toFixed(0)} km/h` : '');
 
   // 神秘車輛：是一場對決

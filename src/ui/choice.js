@@ -1,5 +1,5 @@
 // 三選一卡片與 PA 商店的畫面。內容只在選單版本變動時重畫，倒數條每幀更新。
-const CATEGORY = { part: '零件', skill: '駕駛技能', tradeoff: '取捨' };
+const CATEGORY = { part: '零件', skill: '駕駛技能', tradeoff: '取捨', pa: '補給' };
 const RARITY = { common: '普通', rare: '稀有', legendary: '傳說' };
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
@@ -30,7 +30,13 @@ export function createChoiceUi() {
         seen = menus.version;
         root.style.display = m ? 'block' : 'none';
         document.body.classList.toggle('menu-open', !!m); // 選單開著時收起時速表與按鍵說明，避免重疊
-        if (m && m.kind === 'choice') {
+        if (m && m.kind === 'choice' && m.shop) {
+          // PA 休息站：同一個三選一畫面，只是每張都要用賞金買
+          title.textContent = `PA 休息站　賞金 ${run.bounty}`;
+          const keys = ['←', '↑', '→'];
+          body.innerHTML = m.cards.map((d, i) => card(d, { key: keys[i], count: d.time ? 0 : upgrades.count(d.id) + 1, price: m.prices[i], cantAfford: run.bounty < m.prices[i] })).join('');
+          hint.textContent = `買一樣就上路　↓ 不買，離開${m.note ? '　｜　' + m.note : ''}`;
+        } else if (m && m.kind === 'choice') {
           title.textContent = '選擇一項成長';
           const keys = m.cards.length === 3 ? ['←', '↑', '→'] : m.cards.length === 2 ? ['←', '→'] : ['↑'];
           body.innerHTML = m.cards.map((d, i) => card(d, { key: keys[i], count: upgrades.count(d.id) + 1 })).join('');
