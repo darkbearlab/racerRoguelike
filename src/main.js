@@ -11,6 +11,8 @@ import modelsJson from './config/models.json';
 import looksJson from './config/looks.json';
 import radioJson from './config/radio.json';
 import { createRadio } from './ui/radio.js';
+import { createLyrics } from './ui/lyrics.js';
+import { BGM_LYRICS, BGM_URL } from './audio/gameAudio.js';
 import { createRng } from './core/rng.js';
 import { createEvents } from './core/events.js';
 import { createLoop } from './core/time.js';
@@ -258,6 +260,7 @@ events.on('bossIntro', (e) => {
   hud.bossCard(e.def, e.def.radio?.intro, 6, `${e.def.chassis || ''}　${buffText(e.def)}`);
 });
 // 無線電：對手在對決中的喊話（頭像用車後投影的那個標誌）
+const lyrics = createLyrics({ audio, list: BGM_LYRICS, base: BGM_URL });
 const radio = createRadio({
   events, duel, rival, cfg: radioJson,
   glyphOf: (def) => { const l = rivalLook(def); return { glyph: l.glyph || def.name[0], color: l.led || '#7fd0ff' }; },
@@ -326,7 +329,7 @@ function autoMenu() {
 let started = AUTOPILOT;
 let titleTime = 0;
 const btnStart = document.getElementById('btnStart'), btnSettings = document.getElementById('btnSettings'), settingsEl = document.getElementById('settings');
-const optMirror = document.getElementById('optMirror'), optGfx = document.getElementById('optGfx'), optWet = document.getElementById('optWet'), optBlur = document.getElementById('optBlur'), optVol = document.getElementById('optVol'), optMusic = document.getElementById('optMusic'), optSfx = document.getElementById('optSfx');
+const optMirror = document.getElementById('optMirror'), optGfx = document.getElementById('optGfx'), optWet = document.getElementById('optWet'), optBlur = document.getElementById('optBlur'), optVol = document.getElementById('optVol'), optMusic = document.getElementById('optMusic'), optSfx = document.getElementById('optSfx'), optLyrics = document.getElementById('optLyrics'), optLyricsOff = document.getElementById('optLyricsOff'), optLyricsOffV = document.getElementById('optLyricsOffV');
 try {
   const saved = JSON.parse(localStorage.getItem('settings') || '{}');
   if (typeof saved.mirror === 'boolean') camCfg.mirror = saved.mirror;
@@ -336,6 +339,8 @@ try {
   if (typeof saved.vol === 'number') audio.volume = saved.vol;
   if (typeof saved.music === 'number') audio.musicVolume = saved.music;
   if (typeof saved.sfx === 'number') audio.sfxVolume = saved.sfx;
+  if (typeof saved.lyrics === 'boolean') lyrics.enabled = saved.lyrics;
+  if (typeof saved.lyricsOff === 'number') lyrics.offset = saved.lyricsOff;
 } catch { /* 讀不到就用預設值 */ }
 optMirror.checked = !!camCfg.mirror;
 optGfx.checked = gfx.quality !== 'low';
@@ -344,6 +349,8 @@ optBlur.checked = gfx.blur;
 optVol.value = String(Math.round(audio.volume * 100));
 optMusic.value = String(Math.round(audio.musicVolume * 100));
 optSfx.value = String(Math.round(audio.sfxVolume * 100));
+optLyrics.checked = lyrics.enabled;
+optLyricsOff.value = String(Math.round(lyrics.offset * 10)); optLyricsOffV.textContent = lyrics.offset.toFixed(1);
 applyGfx();
 const saveSettings = () => {
   camCfg.mirror = optMirror.checked;
@@ -353,8 +360,10 @@ const saveSettings = () => {
   audio.volume = Number(optVol.value) / 100;
   audio.musicVolume = Number(optMusic.value) / 100;
   audio.sfxVolume = Number(optSfx.value) / 100;
+  lyrics.enabled = optLyrics.checked;
+  lyrics.offset = Number(optLyricsOff.value) / 10; optLyricsOffV.textContent = lyrics.offset.toFixed(1);
   applyGfx();
-  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume })); } catch { /* 存不了就算了 */ }
+  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume, lyrics: lyrics.enabled, lyricsOff: lyrics.offset })); } catch { /* 存不了就算了 */ }
 };
 optMirror.addEventListener('change', saveSettings);
 optGfx.addEventListener('change', saveSettings);
@@ -363,6 +372,8 @@ optBlur.addEventListener('change', saveSettings);
 optVol.addEventListener('input', saveSettings);
 optMusic.addEventListener('input', saveSettings);
 optSfx.addEventListener('input', saveSettings);
+optLyrics.addEventListener('change', saveSettings);
+optLyricsOff.addEventListener('input', saveSettings);
 function startRun() {
   if (started) return;
   started = true;
@@ -653,6 +664,7 @@ function render(alpha, dt) {
   hud.clock(clock);
   choiceUi.update(menus, session.run, upgrades);
   if (started && !paused) radio.update(dt);
+  lyrics.update();
   setDaylight(clock.progress);
   const toFork = flow.forkS - state.s;
   if (!flow.chosen && flow.options && toFork < 800 && toFork > -5) {
@@ -703,7 +715,7 @@ if (AUTOPILOT) hud.toast('自動駕駛', 2.5);
 window.__game = {
   post, gfx, applyGfx, streamer, scene, trails, reflection, audio, starters, openPick, showPick, confirmPick,
   models: modelsJson,
-  session, state, road, carCfg, playerCfg, upgrades, menus, camCfg, trafficCfg, duelCfg, runCfg, clock, flow, rig, loop, renderer, car, rivalCar, traffic, streamer, duel, rival,
+  lyrics, session, state, road, carCfg, playerCfg, upgrades, menus, camCfg, trafficCfg, duelCfg, runCfg, clock, flow, rig, loop, renderer, car, rivalCar, traffic, streamer, duel, rival,
   /** 快轉模擬 sec 秒後畫一幀（分頁在背景、rAF 被節流時用）。會照常串流道路網格。 */
   advance(sec, inp, until) {
     const n = Math.round(sec * 60);

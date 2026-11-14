@@ -110,6 +110,17 @@
   #bossCard.on { opacity: 1; }
   #bossCard .bt { font-size: 15px; letter-spacing: 10px; color: #ffb8a0; }
   #bossCard .bn { font-size: 68px; font-weight: 800; letter-spacing: 20px; color: #fff; text-shadow: 0 0 26px #ff3020; }
+  /* 直式歌詞字幕：畫面右側，由右往左排；英文會整段側躺 */
+  #lyrics { position: absolute; right: 26px; top: 35%; max-height: 42vh; writing-mode: vertical-rl; text-orientation: mixed; display: flex; flex-direction: column; gap: 10px;
+            font-size: clamp(16px, 2.8vh, 26px); font-weight: 700; letter-spacing: 4px; line-height: 1.5; color: #fff;
+            text-shadow: 0 0 10px rgba(255,90,170,.95), 0 0 22px rgba(255,60,150,.6), 0 2px 4px #000; opacity: 0; transition: opacity .35s, right .25s; pointer-events: none; }
+  /* 交流道的右側牌出現時往左讓開 */
+  #jct[style*="block"] ~ #lyrics { right: 190px; }
+  #lyrics.on { opacity: .95; }
+  #lyrics span { display: block; white-space: nowrap; }
+  #lyrics span:nth-child(2) { margin-top: 1em; }
+  #lyrics span:nth-child(3) { margin-top: 2em; }
+  .picking #lyrics { display: none; }
   /* 無線電：對手喊話。放右上、對手分數條下面，不擋路面 */
   #radio { position: absolute; right: 16px; top: calc(92px + var(--mh, 0px)); width: 300px; display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px;
            background: rgba(8,12,20,.78); border: 1px solid rgba(150,200,255,.45); border-left: 3px solid #7fd0ff; border-radius: 4px;
@@ -204,6 +215,7 @@
   <div id="clock"><div id="clockTime">00:00</div><div id="clockLeft"></div></div>
   <div id="jct"><div id="jctL" class="jtab"><div id="jctLName"></div><div class="jd" id="jctLDist"></div></div><div id="jctR" class="jtab"><div id="jctRName"></div><div class="jd" id="jctRDist"></div></div></div>
   <div id="mirrorFrame"></div>
+  <div id="lyrics"></div>
   <div id="title">
     <h1>深夜高架</h1>
     <h2>ROGUELIKE</h2>
@@ -217,6 +229,8 @@
       <label>高速時的徑向模糊（需開啟高畫質光影）<input type="checkbox" id="optBlur"></label>
       <label>總音量（遊戲中按 M 靜音）<input type="range" id="optVol" min="0" max="100" step="5" value="80"></label>
       <label>音效音量（引擎、撞擊、環境聲）<input type="range" id="optSfx" min="0" max="100" step="5" value="80"></label>
+      <label>歌詞字幕（有整理好歌詞的歌才會出現）<input type="checkbox" id="optLyrics"></label>
+      <label>歌詞時間微調 <span id="optLyricsOffV">0.0</span> 秒（字幕太早就往右）<input type="range" id="optLyricsOff" min="-10" max="10" step="1" value="0"></label>
       <label>音樂音量（遊戲中按 N 換下一首）<input type="range" id="optMusic" min="0" max="100" step="5" value="60"></label>
       <div class="keys">
         <div><b>W / ↑</b>油門</div><div><b>S / ↓</b>煞車／倒車</div><div><b>A D / ← →</b>轉向</div><div><b>空白鍵</b>手煞車（甩尾）</div>

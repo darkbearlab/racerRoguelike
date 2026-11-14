@@ -20,6 +20,8 @@ const GEARS = [0, 60, 105, 150, 195, 235, 300];
 // 每首都有自己的結尾，所以整首播完才接下一首，不做交叉淡化。子資料夾留給之後的專屬 BGM（bgmList.folders）
 const BGM_BASE = `${import.meta.env.BASE_URL}audio/bgm/`;
 const BGM = bgmList.pool;
+export const BGM_LYRICS = bgmList.lyrics || [];
+export const BGM_URL = BGM_BASE;
 const MIN_RATE = 0.08;    // <audio> 播放速度的下限（瀏覽器低於 0.0625 會出錯）
 const MUSIC_LEVEL = 0.8;  // 音樂音量滑桿拉滿時的實際增益
 const ENGINE_LEVEL = 0.34; // 合成器全油門時約 −9 dBFS，會蓋掉所有錄音，所以壓下來
