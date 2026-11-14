@@ -46,6 +46,9 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   const state = createCarState({ s: 20, d: 0, vf: mode === 'run' ? (carCfg.startKmh || 0) / 3.6 : 0 });
   // 對手用自己的底盤數值，不跟著玩家選的車變
   const rival = createRival(rivalBase ? { ...carCfg, ...rivalBase } : carCfg, rivalRng);
+  // 一對多（警車事件）：除了 rival 之外同場的其他車。對決規則不變，只是「對手的位置」取最前面那一台：
+  // 玩家要領先全部才得分，任何一台在前面就是對方得分
+  const pack = [0x1f83d9ab, 0x5be0cd19].map((k) => createRival(rivalBase ? { ...carCfg, ...rivalBase } : carCfg, createRng(seed ^ k)));
   const duel = createDuel(duelCfg, ev);
 
   // 成長：carCfg 是基準值（對手也用它），playerCfg 是套用成長後玩家實際用的數值
@@ -86,9 +89,16 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   const gridAi = { input: {} };
   const clock = runCfg ? createClock(runCfg.clock) : null;
   const playerProxy = { active: true, onAlt: false, s: state.s, d: 0, v: 0, len: 4.4, wid: 1.8, changeT: 0, toD: 0 };
-  const obsForRival = [...traffic.cars, playerProxy];
-  const obsForPlayer = [...traffic.cars, rival.proxy];
-  const racers = [playerProxy, rival.proxy];
+  const obsForRival = [...traffic.cars, playerProxy, pack[0].proxy, pack[1].proxy];
+  const obsForPack = [[...traffic.cars, playerProxy, rival.proxy, pack[1].proxy], [...traffic.cars, playerProxy, rival.proxy, pack[0].proxy]];
+  const obsForPlayer = [...traffic.cars, rival.proxy, pack[0].proxy, pack[1].proxy];
+  const racers = [];
+  /** 最前面／最後面那一台對手（只有一台時就是 rival 自己） */
+  const packEdge = (front) => {
+    let best = rival;
+    for (const x of pack) if (x.active && (front ? x.st.s > best.st.s : x.st.s < best.st.s)) best = x;
+    return best;
+  };
   const onlyPlayer = [playerProxy];
   traffic.populate(playerProxy);
 
@@ -109,7 +119,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   const tierCount = {};
 
   const S = {
-    road, generator, traffic, state, rival, duel, clock, carCfg, playerCfg, upgrades, world, flow, mode,
+    road, generator, traffic, state, rival, pack, packEdge, duel, clock, carCfg, playerCfg, upgrades, world, flow, mode,
     menus: null,         // 三選一與 PA 商店
     boostT: 0,           // 短暫加速的剩餘秒數（甩尾加速）
     lastHook: '',        // 最近觸發的成長（除錯用）
@@ -142,7 +152,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
 
     /** 靠近對手到挑戰範圍內就自動開始倒數（step 裡每步會自己呼叫，不需要玩家按鍵） */
     tryChallenge() {
-      if (!rival.active || rival.onAlt || rival.intro || !duel.canChallenge(state, rival.st)) return false;
+      if (!rival.active || rival.onAlt || rival.intro || !duel.canChallenge(state, packEdge(false).st)) return false;
       rival.flash = 0.5; // 對手閃燈示意
       S.applied = false;
       // 倒數期間兩台車鎖在同一個速度：取玩家當下的車速，但不低於下限、也不超過對手跟得上的範圍
@@ -290,7 +300,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       const wasDrifting = state.drifting, driftTime = state.driftTime;
       if (S.boostT > 0) { S.boostT -= dt; if (S.boostT <= 0) state.boostAccel = 0; }
       generator.fill(state.s + ROAD_AHEAD);
-      const sTrim = Math.min(state.s, rival.active ? rival.st.s : Infinity) - ROAD_BEHIND;
+      const sTrim = Math.min(state.s, rival.active ? packEdge(false).st.s : Infinity) - ROAD_BEHIND;
       road.trim(sTrim);
       if (S.alt) S.alt.trim(sTrim);
 
@@ -322,15 +332,18 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       if (state.vf * 3.6 > S.run.topKmh) S.run.topKmh = state.vf * 3.6;
 
       // ── 車流
+      racers.length = 0; racers.push(playerProxy);
+      if (rival.active) racers.push(rival.proxy);
+      for (const x of pack) if (x.active) racers.push(x.proxy);
       traffic.update(dt, playerProxy, rival.active ? racers : onlyPlayer);
       // 對手前方一段距離不留車流：對手一出現就開始，車是在遠處被收掉的，玩家靠近時那一段已經是空的。
       // 倒數與剛開賽的幾秒也維持淨空，不會還沒開打就撞上
       if (S.clearT > 0) S.clearT -= dt;
       if (rival.active && !rival.onAlt) {
-        const ca = duelCfg.clearAhead ?? 380, rs = rival.st;
+        const ca = duelCfg.clearAhead ?? 380, rs = packEdge(true).st, rearS = packEdge(false).st.s;
         if (rival.intro) S.cleared += traffic.clearRange(state.s + 220, state.s + 220 + ca);   // Boss 從後方登場：先清遠處
-        else if (duel.phase === 'marked') S.cleared += traffic.clearRange(rs.s - (duelCfg.clearBehind ?? 50), rs.s + ca);
-        else if (duel.phase === 'countdown' || (duel.phase === 'racing' && S.clearT > 0)) S.cleared += traffic.clearRange(Math.min(state.s, rs.s) - 15, Math.max(state.s, rs.s) + ca);
+        else if (duel.phase === 'marked') S.cleared += traffic.clearRange(rearS - (duelCfg.clearBehind ?? 50), rs.s + ca);
+        else if (duel.phase === 'countdown' || (duel.phase === 'racing' && S.clearT > 0)) S.cleared += traffic.clearRange(Math.min(state.s, rearS) - 15, Math.max(state.s, rs.s) + ca);
       }
 
       // ── 對手
@@ -362,6 +375,18 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         if (rival.intro && !onAlt && Math.abs(rs.d - state.d) < 2.2 && rs.s - state.s > -9.5 && rs.s - state.s < 5) { rs.vf = Math.min(rs.vf, state.vf); rival.proxy.v = rs.vf; }
         if (gridTarget != null) { rs.vf += Math.min(16 * dt, Math.max(-16 * dt, gridTarget - rs.vf)); rival.proxy.v = rs.vf; }
       } else { rival.proxy.active = false; rival.proxy.onAlt = false; }
+      // 同場的其他對手（警車隊）：同一套 AI，倒數時各自排在玩家前方不同的距離
+      for (let k = 0; k < pack.length; k++) {
+        const x = pack[k];
+        if (!x.active) { x.proxy.active = false; continue; }
+        let gt = null;
+        if (grid) gt = S.gridV + (duel.timer > 0.8 ? Math.min(8, Math.max(-8, (state.s + 28 + 16 * k - x.st.s) * 0.8)) : 0);
+        updateRival(x, dt, {
+          road, obstacles: obsForPack[k], player: playerProxy, phase: duel.phase, matchRange: duelCfg.matchRange, challengeRange: duelCfg.challengeRange, gridTarget: gt,
+          slip: traffic.slipstream(x.st, x.cfg.slipstreamRange, x.cfg.slipstreamWidth, playerProxy), jctSide: 0,
+        });
+        if (gt != null) { x.st.vf += Math.min(16 * dt, Math.max(-16 * dt, gt - x.st.vf)); x.proxy.v = x.st.vf; }
+      }
 
       // ── 碰撞
       if (!menu) collidePlayerTraffic(state, playerCfg, traffic, trafficCfg, road, dt, ev);
@@ -372,10 +397,21 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         playerProxy.s = state.s; playerProxy.d = state.d; playerProxy.v = state.vf;
         rival.proxy.s = rival.st.s; rival.proxy.d = rival.st.d; rival.proxy.v = rival.st.vf;
       }
+      for (let k = 0; k < pack.length; k++) {
+        const x = pack[k];
+        if (!x.active) continue;
+        collidePlayerTraffic(x.st, x.cfg, traffic, trafficCfg, road, dt, null);
+        if (!menu) collidePair(state, playerCfg, x.st, x.cfg, road, ev);
+        // 對手彼此也不能重疊
+        if (rival.active) collidePair(rival.st, rival.cfg, x.st, x.cfg, road, null);
+        if (k === 1 && pack[0].active) collidePair(pack[0].st, pack[0].cfg, x.st, x.cfg, road, null);
+        x.proxy.s = x.st.s; x.proxy.d = x.st.d; x.proxy.v = x.st.vf;
+      }
+      playerProxy.s = state.s; playerProxy.d = state.d; playerProxy.v = state.vf;
 
       // ── 對決：靠近就自動開戰，然後計分
       if (duelCfg.autoChallenge !== false && duel.phase === 'marked' && !menu) S.tryChallenge();
-      if (rival.active) duel.update(dt, playerProxy, rival.proxy);
+      if (rival.active) duel.update(dt, playerProxy, packEdge(true).proxy);
       if (duel.phase === 'result' && !S.applied) {
         S.applied = true;
         const tier = rival.def.tier || 'normal';
@@ -423,7 +459,12 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
           const nt = nights ? nights[S.run.night - 1] : null, base = pool[n % pool.length];
           // 越後面的夜晚，對手身上隨機的 buff 越多（強敵、神秘車、警車另外再加）
           const def = dress(base, (nt?.rivalBuffs ?? 0) + (runCfg.rivalBuffsByTier?.[base.tier] ?? 0));
-          if (S.spawnRival(def, sAt)) { tierCount[flow.rivalPending] = n + 1; flow.rivalPending = null; }
+          if (S.spawnRival(def, sAt)) {
+            // 警車事件：一次來好幾台，各自在不同車道、前後錯開
+            const cnt = base.tier === 'police' ? (runCfg.events?.police?.count ?? 1) : 1;
+            if (cnt > 1) S.spawnPack(base, sAt, cnt - 1, (nt?.rivalBuffs ?? 0) + (runCfg.rivalBuffsByTier?.[base.tier] ?? 0));
+            tierCount[flow.rivalPending] = n + 1; flow.rivalPending = null;
+          }
         }
       } else if (duel.phase === 'marked') {
         // 一直不挑戰：超過對手一段距離、或這個節點開太遠，對手離開
@@ -653,7 +694,23 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       return true;
     },
 
+    /** 在 rival 後面再放幾台同款對手（一對多）。每台各自抽 buff */
+    spawnPack(base, sAt, count, extraBuffs = 0) {
+      const lanes = [];
+      for (let l = 0; l < road.lanes; l++) if (l !== rival.mem.lane) lanes.push(l);
+      const gap = runCfg.events?.police?.stagger ?? 14, defs = [rival.def];
+      for (let k = 0; k < Math.min(count, pack.length, lanes.length); k++) {
+        const x = pack[k], s = sAt - gap * (k + 1), def = dress(base, extraBuffs);
+        placeRival(x, def, road, s, lanes[k]);
+        x.st.d = road.laneCenterAt(lanes[k], s);
+        x.proxy.active = true; x.proxy.onAlt = false; x.proxy.s = s; x.proxy.d = x.st.d; x.proxy.v = x.st.vf;
+        defs.push(def);
+      }
+      emit('packSpawn', { defs });
+    },
+
     despawn() {
+      for (const x of pack) { x.active = false; x.proxy.active = false; }
       rival.active = false; rival.onAlt = false;
       rival.proxy.active = false; rival.proxy.onAlt = false;
       duel.clear();

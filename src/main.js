@@ -75,13 +75,14 @@ const gfx = { quality: params.get('gfx') === 'low' ? 'low' : 'high', wet: params
 const streamer = createStreamer(scene, road, renderer, seed);
 let trafficMesh = null, car = null, rivalCar = null, nightEnv = null;
 const reflection = createReflection(renderer, streamer.roadMaterial);
-const trails = createTrails(scene, trafficCfg.maxCars * 2 + 4);
+const trails = createTrails(scene, trafficCfg.maxCars * 2 + 8);
 const TRAIL_PLAYER = trafficCfg.maxCars * 2, TRAIL_RIVAL = TRAIL_PLAYER + 2;
 const applyGfx = () => {
   const hi = gfx.quality !== 'low';
   post.enabled = hi;
   streamer.setHdr(post.active); setMood(post.active); trafficMesh?.setHdr(post.active);
   car?.setHdr(post.active); rivalCar?.setHdr(post.active);
+  if (typeof packCars !== 'undefined') for (const m of packCars) m.setHdr(post.active);
   trails.enabled = hi; trails.setHdr(post.active);
   reflection.enabled = post.active && gfx.wet;
   post.blur = gfx.blur;
@@ -133,6 +134,13 @@ rivalCar = createCarModel({ player: false, color: 0x888888, spec: modelsJson.hat
 rivalCar.setView('chase');
 rivalCar.group.visible = false;
 rivalCar.group.matrixAutoUpdate = false;
+// 一對多時同場的其他對手（警車隊）
+const packCars = session.pack.map(() => {
+  const m = createCarModel({ player: false, color: 0x888888, spec: modelsJson.police });
+  m.setView('chase'); m.group.visible = false; m.group.matrixAutoUpdate = false;
+  scene.add(m.group);
+  return m;
+});
 scene.add(rivalCar.group);
 trafficMesh = createTrafficMesh(scene, road, traffic, trafficCfg, modelsJson);
 trafficMesh.setTrails(trails);
@@ -236,6 +244,14 @@ events.on('rivalMarked', (e) => {
 });
 // 對手身上的 buff 清單（和玩家同一套成長）
 const buffText = (def) => (def.buffList || []).map((it) => it.def.name + (it.count > 1 ? `×${it.count}` : '')).join('・');
+events.on('packSpawn', (e) => {
+  e.defs.slice(1).forEach((def, k) => {
+    const m = packCars[k];
+    m.setSpec(modelsJson[def.model] || modelsJson.police, def.color); m.setLook(rivalLook(def));
+    m.marker.material.color.setRGB(0.5, 1.0, 3.4);
+  });
+  hud.toast(`🚨 ${e.defs.length} 台巡邏車　要領先全部才算得分`, 3.2);
+});
 events.on('bossIntro', (e) => {
   dressRival(e.def, 'gt');
   rivalCar.marker.material.color.setRGB(3.4, 2.4, 0.3); // Boss 的標記是金色
@@ -461,7 +477,7 @@ function step(dt) {
 // ── 姿態：道路座標 → 世界座標
 const fr = makeFrame();
 const newPose = () => ({ p: new THREE.Vector3(), f: new THREE.Vector3(), u: new THREE.Vector3(), l: new THREE.Vector3() });
-const pose = newPose(), rPose = newPose();
+const pose = newPose(), rPose = newPose(), xPose = newPose();
 const T = new THREE.Vector3(), R = new THREE.Vector3();
 const basis = new THREE.Matrix4();
 const v3 = new THREE.Vector3(), v3b = new THREE.Vector3();
@@ -516,6 +532,17 @@ function render(alpha, dt) {
     if (wantTaunt !== rivalCar.taunting && rivalTauntCool <= 0) { rivalCar.setTaunt(wantTaunt); rivalTauntCool = 1.5; }
     rivalCar.setMarker(session.courier || duel.phase === 'marked' || duel.phase === 'countdown' || duel.phase === 'racing', dt);
   } else rivalCar.group.visible = false;
+  for (let k = 0; k < packCars.length; k++) {
+    const x = session.pack[k], m = packCars[k];
+    m.group.visible = x.active;
+    if (!x.active) continue;
+    computePose(x.prev.s + (x.st.s - x.prev.s) * a, x.prev.d + (x.st.d - x.prev.d) * a, lerpAngle(x.prev.psi, x.st.psi, a), xPose);
+    basis.makeBasis(xPose.l, xPose.u, xPose.f);
+    m.group.matrix.copy(basis).setPosition(xPose.p);
+    m.group.matrixWorldNeedsUpdate = true;
+    if (!paused) { m.update(x.st, dt, x.flash); feedTrails(TRAIL_RIVAL + 2 + k * 2, m, xPose.p, xPose.l, xPose.u, xPose.f, Math.abs(x.st.vf) * 3.6, x.st.braking); }
+    m.setMarker(duel.phase === 'marked' || duel.phase === 'countdown' || duel.phase === 'racing', dt);
+  }
 
   computePose(prev.s + (state.s - prev.s) * a, prev.d + (state.d - prev.d) * a, lerpAngle(prev.psi, state.psi, a), pose);
   basis.makeBasis(pose.l, pose.u, pose.f);
@@ -603,7 +630,8 @@ function render(alpha, dt) {
   tagInfo.courier = session.courier;
   tagInfo.threshold = duel.mods.threshold;
   if (rival.active) {
-    tagInfo.name = rival.def.name;
+    const packN = 1 + session.pack.filter((x) => x.active).length;
+    tagInfo.name = packN > 1 ? `${rival.def.name} ×${packN}` : rival.def.name;
     tagInfo.ahead = rival.st.s - state.s;
     tagInfo.canChallenge = false;
     v3.copy(rPose.p).addScaledVector(rPose.u, 3.5).project(rig.camera);

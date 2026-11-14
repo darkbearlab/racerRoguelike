@@ -340,7 +340,7 @@ section('事件：警車、塞車、送貨');
     check('送貨：追上並排就送達，越快獎勵越好', !!r && !r.fail && r.bounty > 0 && !d.E.courier && rcfg.events.delivery.rewards[0].bounty > rcfg.events.delivery.rewards[1].bounty, r && !r.fail ? `${r.sec.toFixed(0)} 秒 → +${r.bounty}${r.choice ? '＋三選一' : ''}` : `${t.toFixed(0)} 秒內沒追上`);
     const nodes0 = d.E.flow.nodesDone;
     drive(d.E, 25);
-    check('送達後節點結束、目標車離開', nodes0 >= 1 && !d.E.courier && (!d.E.rival.active || d.E.rival.mode === 'leave'), d.E.rival.active ? '目標車減速靠邊中' : '目標車已離開');
+    check('送達後節點結束、目標車離開', nodes0 >= 1 && !d.E.courier && (!d.E.rival.active || d.E.rival.mode === 'leave' || d.E.rival.def.tier !== 'courier'), !d.E.rival.active ? '目標車已離開' : d.E.rival.def.tier !== 'courier' ? '目標車已離開，下一個節點的對手已經出現' : '目標車減速靠邊中');
   }
 }
 console.log(failed ? `\n${failed} 項失敗` : '\n成長系統全部通過');

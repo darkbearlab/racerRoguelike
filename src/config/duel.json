@@ -21,7 +21,7 @@
   "stopSeconds": 5,
   "loseMinutes": 15,
   "bounty": 100,
-  "bountyByTier": { "normal": 100, "elite": 160, "mystery": 200, "police": 220, "boss": 300 },
+  "bountyByTier": { "normal": 100, "elite": 160, "mystery": 200, "police": 320, "boss": 300 },
   "spawnAhead": 320,
   "skipBehind": 300,
   "respawnDelay": 6

@@ -128,6 +128,41 @@ section('Boss 連戰模式');
   }
 }
 
+section('一對多：警車事件三台同場');
+{
+  const { S, ev } = make(909);
+  S.forceEvent = 'police';
+  const st = S.state, inp = {}, mem = createAiMemory();
+  let packDefs = null, side = 0;
+  ev.on('packSpawn', (e) => { packDefs = e.defs; });
+  const all = () => [S.rival, ...S.pack].filter((x) => x.active);
+  const run = (sec, until) => { for (let t = 0; t < sec; t += DT) {
+    const z = S.road.zoneAt(st.s + 150), z0 = S.road.zoneAt(st.s), approaching = !S.flow.chosen && (z === 1 || z === 2 || z0 === 1 || z0 === 2);
+    if (approaching && !side && S.flow.options) side = S.flow.options[0] === 'event' ? -1 : 1;
+    if (!approaching) side = 0;
+    autopilot(st, S.playerCfg, S.road, { traffic: S.obsForPlayer, mem, dt: DT, line: !approaching, preferD: approaching ? side * 4.6 : null }, inp);
+    const m = S.menus.current; if (m && m.lock <= 0) S.menus.input('left');
+    S.step(DT, inp);
+    if (until && until()) return true;
+  } return false; };
+  // 第一個交流道不一定有事件：把兩邊都改成事件，保證走進去
+  S.flow.options[0] = 'event'; S.flow.options[1] = 'event';
+  run(120, () => !!packDefs);
+  check('警車事件：三台同時出現在前方，各在不同車道', !!packDefs && all().length === 3 && new Set(all().map((x) => x.mem.lane)).size === 3 && all().every((x) => x.st.s > st.s),
+    packDefs ? all().map((x) => `前方 ${(x.st.s - st.s).toFixed(0)} m`).join('、') : '沒有出現');
+  run(60, () => S.duel.phase === 'racing');
+  const racing = S.duel.phase === 'racing';
+  // 直接擺位置驗規則：超過兩台、還有一台在前面 → 玩家不得分；三台都在後面才得分
+  const place = (offs) => { all().forEach((x, i) => { x.st.s = st.s + offs[i]; x.prev.s = x.st.s; x.proxy.s = x.st.s; x.st.vf = st.vf; }); };
+  const scoreAfter = (offs) => { const p0 = S.duel.scoreP; let sc = 0; for (let i = 0; i < 60; i++) { place(offs); S.step(DT, inp); sc = S.duel.scoring; } return { gain: S.duel.scoreP - p0, sc }; };
+  const a = scoreAfter([-80, -70, 60]);
+  const b = scoreAfter([-80, -70, -60]);
+  check('一對多：還有一台在前面就不算領先，三台都甩開才得分', racing && a.gain <= 0 && a.sc === -1 && b.gain > 0 && b.sc === 1, `超過兩台：玩家 ${a.gain > 0 ? '得分' : '沒得分'}（對方得分中）；三台都在後面：+${b.gain.toFixed(1)} 分`);
+  S.duel.finish(true, 'score');
+  run(40, () => !S.rival.active);
+  check('一對多：分出勝負後整隊離開', all().length === 0 && S.run.defeats === 1 && S.run.bounty >= dcfg.bountyByTier.police, `賞金 +${dcfg.bountyByTier.police}`);
+}
+
 section('完整一局：三晚打到通關（對決由測試直接判勝，驗證流程）');
 {
   // 時鐘放慢成每晚約 37 分鐘：這個測試要把每種節點都走過一遍，重點是流程不是時間

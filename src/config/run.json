@@ -46,6 +46,7 @@
     "weights": { "jam": 1, "police": 1, "mystery": 1, "delivery": 1 },
     "jam": { "startAfterFork": 380, "length": 750, "cars": 24, "kmhMin": 28, "kmhMax": 46, "bounty": 120, "fastBonus": 80, "parSeconds": 24, "slowSeconds": 44, "hitPenalty": 40 },
     "delivery": { "helperBehind": 40, "spawnAhead": 550, "catchRange": 10, "timeLimit": 80, "rewards": [{ "sec": 35, "bounty": 240, "choice": true }, { "sec": 50, "bounty": 150 }, { "sec": 80, "bounty": 80 }] },
+    "police": { "count": 3, "stagger": 14 },
     "mystery": { "bounty": 200 }
   },
   "trafficDensity": { "night": 0.8, "dawn": 1.4 }
