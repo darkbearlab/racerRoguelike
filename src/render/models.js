@@ -21,6 +21,34 @@ export function createCarModel(opts = {}) {
     color: opts.color ?? 0x1d4fd0, vertexColors: true, flatShading: true, roughness: 0.34, metalness: 0.55, side: THREE.DoubleSide,
   });
   const hoodPaint = new THREE.MeshPhysicalMaterial({ color: opts.color ?? 0x1d4fd0, roughness: 0.34, metalness: 0.55 });
+  // 塗裝：在片段著色器裡依車身座標畫花樣（條紋、雙色、斜紋…），只畫在烤漆的面上（頂點色是白的那些）
+  const liv = { uLivB: { value: new THREE.Color(0xf2f2f0) }, uLivP: { value: 0 }, uLivD: { value: new THREE.Vector3(4.4, 1.8, 1.3) } };
+  paint.onBeforeCompile = (sh) => {
+    sh.uniforms.uLivB = liv.uLivB; sh.uniforms.uLivP = liv.uLivP; sh.uniforms.uLivD = liv.uLivD;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLivPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLivPos = position;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vLivPos;
+uniform vec3 uLivB; uniform float uLivP; uniform vec3 uLivD;
+float livMask(vec3 p) {
+  float L = uLivD.x, W = uLivD.y, H = uLivD.z, ax = abs(p.x);
+  if (uLivP < 0.5) return 0.0;
+  if (uLivP < 1.5) return step(W * 0.045, ax) * step(ax, W * 0.17);                       // 雙條紋
+  if (uLivP < 2.5) return step(p.y, H * 0.47);                                            // 上下雙色
+  if (uLivP < 3.5) { float t = (p.z + p.y * 1.3) / (L * 0.13); return step(-3.0, t) * step(t, 0.0) * step(fract(t), 0.55); } // 車尾斜紋
+  if (uLivP < 4.5) { float v = smoothstep(L * 0.3, -L * 0.38, p.z); return floor(v * 6.0 + 0.5) / 6.0; }                   // 前後漸層（分階）
+  if (uLivP < 5.5) return max(step(-W * 0.36, p.x) * step(p.x, -W * 0.2), step(-W * 0.16, p.x) * step(p.x, -W * 0.125));  // 偏置條紋
+  float c = mod(floor(p.z / 0.3) + floor(p.y / 0.3), 2.0);                                // 車尾方格
+  return c * step(p.z, -L * 0.14);
+}`)
+      .replace('#include <color_fragment>', `#ifdef USE_COLOR
+  { float pm = step(0.9, vColor.r);
+    diffuseColor.rgb = mix(diffuseColor.rgb * vColor.rgb, mix(diffuseColor.rgb, uLivB, livMask(vLivPos)), pm); }
+#endif`);
+  };
+  paint.customProgramCacheKey = () => 'livery';
   const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.75, metalness: 0.2 });
   const headMat = new THREE.MeshBasicMaterial({ color: 0xfff4d8 });
   const tailMat = new THREE.MeshBasicMaterial({ color: 0xff1a12 });
@@ -53,6 +81,60 @@ export function createCarModel(opts = {}) {
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.03;
   exterior.add(shadow);
+
+  // ── 車底 LED：車身輪廓外一圈發光，打在路面上
+  const gc = document.createElement('canvas');
+  gc.width = gc.height = 128;
+  const gg = gc.getContext('2d');
+  gg.fillStyle = '#000'; gg.fillRect(0, 0, 128, 128);
+  gg.shadowColor = '#fff'; gg.shadowBlur = 16; gg.strokeStyle = '#fff'; gg.lineWidth = 7;
+  for (let k = 0; k < 2; k++) gg.strokeRect(34, 26, 60, 76);
+  gg.shadowBlur = 0; gg.fillStyle = 'rgba(255,255,255,0.14)'; gg.fillRect(34, 26, 60, 76);
+  const glowMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glowMat);
+  glow.renderOrder = 3; glow.rotation.x = -Math.PI / 2; glow.position.y = 0.036; glow.visible = false;
+  exterior.add(glow);
+  const ledColor = new THREE.Color(0x30c8ff);
+
+  // ── 車後投影：把車手的標誌打在車尾後方的路面上，偶爾換成挑釁的表情符號
+  const pc = document.createElement('canvas');
+  pc.width = pc.height = 256;
+  const pg = pc.getContext('2d');
+  const projTex = new THREE.CanvasTexture(pc);
+  projTex.colorSpace = THREE.SRGBColorSpace;
+  const projMat = new THREE.MeshBasicMaterial({ map: projTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const proj = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), projMat);
+  // 貼圖的上緣朝車頭：從後方看過去字是正的
+  proj.renderOrder = 3; proj.rotation.x = Math.PI / 2; proj.position.y = 0.04; proj.visible = false;
+  exterior.add(proj);
+  const look = { glyph: null, name: '', taunts: [], tint: '#ffffff' };
+  let taunting = false, projPulse = 0;
+  function drawProj(emoji) {
+    pg.globalCompositeOperation = 'source-over';
+    pg.fillStyle = '#000'; pg.fillRect(0, 0, 256, 256);
+    // 投影燈打出來的光斑
+    const g = pg.createRadialGradient(128, 128, 20, 128, 128, 126);
+    g.addColorStop(0, 'rgba(255,255,255,0.20)'); g.addColorStop(0.8, 'rgba(255,255,255,0.10)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    pg.fillStyle = g; pg.beginPath(); pg.arc(128, 128, 126, 0, Math.PI * 2); pg.fill();
+    pg.textAlign = 'center'; pg.textBaseline = 'middle';
+    if (emoji) {
+      pg.font = '150px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+      pg.fillText(emoji, 128, 138);
+    } else {
+      pg.strokeStyle = look.tint; pg.lineWidth = 9;
+      pg.beginPath(); pg.arc(128, 128, 104, 0, Math.PI * 2); pg.stroke();
+      pg.lineWidth = 3; pg.beginPath(); pg.arc(128, 128, 90, 0, Math.PI * 2); pg.stroke();
+      pg.fillStyle = '#fff';
+      pg.font = `900 ${look.name ? 112 : 132}px "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif`;
+      pg.fillText(look.glyph, 128, look.name ? 116 : 134);
+      if (look.name) {
+        pg.fillStyle = look.tint;
+        pg.font = '700 26px "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif';
+        pg.fillText(look.name, 128, 190);
+      }
+    }
+    projTex.needsUpdate = true;
+  }
 
   function setSpec(spec, color) {
     const built = buildCar(spec);
@@ -90,6 +172,12 @@ export function createCarModel(opts = {}) {
     addLights(built.head, headMat);
     addLights(built.tail, tailMat);
     shadow.scale.set(dims.W + 0.9, dims.L + 1.0, 1);
+    liv.uLivD.value.set(dims.L, dims.W, dims.H);
+    // 光圈在貼圖裡佔 60×76／128，換算成比車身輪廓略大一圈
+    glow.scale.set((dims.W + 0.1) * 128 / 60, (dims.L + 0.1) * 128 / 76, 1);
+    const ps = isPlayer ? 1.7 : 3.0, pl = isPlayer ? 1.7 : 4.6;   // 對手的投影大一點，而且沿車長拉長：從後方低角度看才不會扁成一條
+    proj.scale.set(-ps, pl, 1);
+    proj.position.z = -dims.L / 2 - (isPlayer ? 0.25 : 0.5) - pl / 2;
     marker.position.y = dims.H + 1.4;
     markerBase = dims.H + 1.4;
     // 駕駛艙視角看得到的引擎蓋：高度與長度跟著車型
@@ -202,6 +290,28 @@ export function createCarModel(opts = {}) {
     get dims() { return dims; },
     /** 換車型與顏色（對手每次出場用） */
     setSpec,
+    /**
+     * 外觀：{ color, color2, pattern（0 = 單色，其餘見著色器）, led（顏色或 null）, glyph（標誌的字或 null）, name, taunts[] }
+     */
+    setLook(o) {
+      if (o.color != null) { paint.color.set(o.color); hoodPaint.color.set(o.color); }
+      liv.uLivB.value.set(o.color2 ?? '#f2f2f0');
+      liv.uLivP.value = o.pattern || 0;
+      glow.visible = !!o.led;
+      if (o.led) ledColor.set(o.led);
+      look.glyph = o.glyph || null; look.name = o.name || ''; look.taunts = o.taunts || [];
+      look.tint = o.led || '#ffffff';
+      proj.visible = !!look.glyph;
+      taunting = false;
+      if (look.glyph) drawProj(null);
+    },
+    /** 投影換成挑釁的表情符號（on = false 換回標誌）。每次打開隨機挑一個 */
+    setTaunt(on) {
+      if (!look.glyph || on === taunting || (on && !look.taunts.length)) return;
+      taunting = on; projPulse = 1;
+      drawProj(on ? look.taunts[Math.floor(Math.random() * look.taunts.length)] : null);
+    },
+    get taunting() { return taunting; },
     /** HDR 後處理開著時，車燈用遠超過 1 的亮度，交給 bloom 暈開 */
     setHdr(on) { hdr = on; },
     /** env = 夜景環境貼圖（null = 關掉漆面倒影，低畫質用） */
@@ -232,6 +342,9 @@ export function createCarModel(opts = {}) {
         if (w.front) w.pivot.rotation.y = st.steer * 0.42;
       }
       wheel.rotation.z = -st.steer * 1.6;
+      // 車底燈微微呼吸；投影剛換圖時閃一下
+      if (glow.visible) { const k = (0.85 + 0.15 * Math.sin(spin * 0.02 + markT * 2 + performance.now() * 0.003)) * (hdr ? 1.5 : 0.8); glowMat.color.copy(ledColor).multiplyScalar(k); }
+      if (proj.visible) { projPulse = Math.max(0, projPulse - dt * 2.5); projMat.color.setScalar((hdr ? 1.25 : 0.9) * (1 + projPulse * 0.6)); }
       const tk = (st.braking ? 2.4 : 0.9) * (hdr ? 5.5 : 1);
       tailMat.color.setRGB(tk, tk * 0.035, tk * 0.018);
       spot.intensity = flash > 0 ? LIGHT_HIGH : LIGHT_LOW;

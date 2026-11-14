@@ -8,6 +8,7 @@ import rivalsJson from './config/rivals.json';
 import runJson from './config/run.json';
 import upgradesJson from './config/upgrades.json';
 import modelsJson from './config/models.json';
+import looksJson from './config/looks.json';
 import { createRng } from './core/rng.js';
 import { createEvents } from './core/events.js';
 import { createLoop } from './core/time.js';
@@ -96,7 +97,35 @@ function feedTrails(id, model, p, l, u, f, kmh, braking, gain = 1) {
     trails.feed(id + k, v3t.x, v3t.y, v3t.z, l.x * 0.085, l.y * 0.085, l.z * 0.085, a * gain);
   }
 }
+// ── 外觀：塗裝、車底燈、車後投影。玩家的選擇存在瀏覽器裡；對手的外觀由名字算出來（每次都一樣）
+const LOOK_KEYS = ['body', 'livery', 'accent', 'led', 'emblem'];
+const LOOK_LISTS = { body: looksJson.bodies, livery: looksJson.liveries, accent: looksJson.accents, led: looksJson.leds, emblem: looksJson.emblems };
+const lookSel = { ...looksJson.playerDefault };
+try {
+  const saved = JSON.parse(localStorage.getItem('look') || '{}');
+  for (const k of LOOK_KEYS) if (Number.isInteger(saved[k]) && saved[k] >= 0 && saved[k] < LOOK_LISTS[k].length) lookSel[k] = saved[k];
+} catch { /* 讀不到就用預設值 */ }
+const PATTERN = Object.fromEntries(looksJson.liveries.map((l) => [l.id, l.p]));
+const playerLook = () => ({
+  color: looksJson.bodies[lookSel.body].color || starter.color, color2: looksJson.accents[lookSel.accent].color,
+  pattern: looksJson.liveries[lookSel.livery].p, led: looksJson.leds[lookSel.led].color,
+  glyph: looksJson.emblems[lookSel.emblem].glyph, name: '', taunts: looksJson.taunts,
+});
+const applyLook = () => car.setLook(playerLook());
+const hashStr = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619) >>> 0; return h; };
+function rivalLook(def) {
+  const o = looksJson.rivals[def.id] || {}, h = hashStr(def.id);
+  const fancy = def.tier === 'elite' || def.tier === 'boss' || h % 5 < 2;
+  const livery = o.livery ?? (h % 3 === 0 ? 'solid' : looksJson.liveries[1 + (h >>> 3) % (looksJson.liveries.length - 1)].id);
+  return {
+    color: def.color, color2: o.color2 ?? looksJson.accents[(h >>> 6) % looksJson.accents.length].color, pattern: PATTERN[livery] || 0,
+    led: 'led' in o ? o.led : fancy ? looksJson.leds[1 + (h >>> 9) % (looksJson.leds.length - 1)].color : null,
+    glyph: 'glyph' in o ? o.glyph : def.name[0], name: def.name, taunts: looksJson.taunts,
+  };
+}
+const dressRival = (def, fallback) => { rivalCar.setSpec(modelsJson[def.model] || modelsJson[fallback], def.color); rivalCar.setLook(rivalLook(def)); };
 car = createCarModel({ spec: modelsJson[carCfg.model] || modelsJson.coupe, color: starter.color });
+applyLook();
 scene.add(car.group);
 rivalCar = createCarModel({ player: false, color: 0x888888, spec: modelsJson.hatch });
 rivalCar.setView('chase');
@@ -199,12 +228,12 @@ events.on('carHit', (e) => {
   pendingSparks.push({ side: e.longitudinal ? 0 : e.side, n: 18 });
 });
 events.on('rivalMarked', (e) => {
-  rivalCar.setSpec(modelsJson[e.def.model] || modelsJson.hatch, e.def.color);
+  dressRival(e.def, 'hatch');
   if (e.def.tier === 'police') rivalCar.marker.material.color.setRGB(0.5, 1.0, 3.4); else rivalCar.marker.material.color.setRGB(3.2, 0.5, 0.25);
   hud.toast(`對手出現：${e.def.name}`, 2.2);
 });
 events.on('bossIntro', (e) => {
-  rivalCar.setSpec(modelsJson[e.def.model] || modelsJson.gt, e.def.color);
+  dressRival(e.def, 'gt');
   rivalCar.marker.material.color.setRGB(3.4, 2.4, 0.3); // Boss 的標記是金色
   hud.bossCard(e.def, e.def.radio?.intro);
 });
@@ -220,7 +249,7 @@ events.on('eventStart', (e) => hud.toast(
       : e.kind === 'delivery' ? '❓ 後面有台車靠過來了…' : '❓ 有輛來路不明的車…', 3));
 events.on('deliveryAsk', () => hud.toast('「幫我把這個交給前面那台白色旅行車！」', 3.2));
 events.on('courierSpawn', (e) => {
-  rivalCar.setSpec(modelsJson[e.def.model] || modelsJson.wagon, e.def.color);
+  dressRival(e.def, 'wagon');
   rivalCar.marker.material.color.setRGB(0.6, 2.6, 1.2);   // 目標車的標記是綠色
 });
 events.on('eventResult', (e) => hud.toast(
@@ -231,12 +260,15 @@ events.on('rivalSkipped', () => hud.toast('對手離開了', 1.8));
 let approachMem = 0;
 events.on('duelCountdown', (e) => hud.countdown(String(e.count)));
 events.on('duelGo', () => hud.countdown('BATTLE'));
+let playerTauntT = 0, rivalTauntCool = 0;
 events.on('duelZero', (e) => {
+  if (e.who === 'rival') playerTauntT = 4;   // 超過對手：車後投影換成挑釁表情
   hud.zero(e.who);
   if (e.who === 'player' && e.lost > 1) hud.toast(`被超車　分數歸零 −${Math.round(e.lost)}`, 1.6);
   else if (e.who === 'rival' && e.lost > 1) hud.toast('超車　對手分數歸零', 1.6);
 });
 events.on('duelEnd', (e) => {
+  if (e.win) playerTauntT = 6;
   const tier = rival.def?.tier || 'normal';
   const fine = duelCfg.loseBountyByTier?.[tier];
   hud.banner(e.win, e.reason, e.win ? `賞金 +${duelCfg.bountyByTier?.[tier] ?? duelCfg.bounty}` : `−${duelCfg.loseMinutesByTier?.[tier] ?? duelCfg.loseMinutes} 分鐘${fine ? `　罰金 ${fine}` : ''}`);
@@ -329,9 +361,28 @@ function showPick(i) {
   pickIdx = (i + starters.length) % starters.length;
   starter = starters[pickIdx];
   car.setSpec(modelsJson[starter.model] || modelsJson.coupe, starter.color);
+  applyLook();
+  if (picking) drawLookRow();
   car.setHdr(post.active);
   [...carCards.children].forEach((el, k) => el.classList.toggle('active', k === pickIdx));
 }
+const lookRow = document.getElementById('lookRow');
+const LOOK_LABEL = { body: '車色', livery: '塗裝', accent: '配色', led: '車底燈', emblem: '車後投影' };
+function drawLookRow() {
+  lookRow.innerHTML = LOOK_KEYS.map((k, i) => {
+    const it = LOOK_LISTS[k][lookSel[k]], c = k === 'body' ? it.color || starter.color : it.color;
+    return `<button class="lchip" data-k="${k}"><small>${i + 1}</small>${LOOK_LABEL[k]}：${it.name}${c ? `<i style="background:${c}"></i>` : ''}</button>`;
+  }).join('');
+}
+function cycleLook(k, dir = 1) {
+  const n = LOOK_LISTS[k].length;
+  lookSel[k] = (lookSel[k] + dir + n) % n;
+  try { localStorage.setItem('look', JSON.stringify(lookSel)); } catch { /* 存不了就算了 */ }
+  applyLook();
+  if (picking) drawLookRow();
+  drawLookRow();
+}
+lookRow.addEventListener('click', (e) => { const b = e.target.closest('.lchip'); if (b) cycleLook(b.dataset.k, e.shiftKey ? -1 : 1); });
 function openPick() {
   if (started || picking) return;
   picking = true;
@@ -347,6 +398,7 @@ function openPick() {
   });
   document.body.classList.add('picking');
   showPick(pickIdx);
+  drawLookRow();
 }
 function closePick() { picking = false; document.body.classList.remove('picking'); }
 function confirmPick() {
@@ -383,6 +435,7 @@ addEventListener('keydown', (e) => {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') showPick(pickIdx - 1);
     else if (e.code === 'ArrowRight' || e.code === 'KeyD') showPick(pickIdx + 1);
     else if (e.code === 'Enter' || e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); confirmPick(); }
+    else if (/^Digit[1-5]$/.test(e.code)) cycleLook(LOOK_KEYS[Number(e.code[5]) - 1], e.shiftKey ? -1 : 1);
     else if (e.code === 'Escape') closePick();
     return;
   }
@@ -450,6 +503,10 @@ function render(alpha, dt) {
     rivalCar.group.visible = true;
     if (!paused) rivalCar.update(rs, dt, rival.flash);
     if (!paused) feedTrails(TRAIL_RIVAL, rivalCar, rPose.p, rPose.l, rPose.u, rPose.f, Math.abs(rs.vf) * 3.6, rs.braking);
+    // 對手領先時把投影換成挑釁表情，被超過就換回標誌
+    rivalTauntCool -= dt;
+    const wantTaunt = duel.phase === 'racing' && rs.s > state.s + 4;
+    if (wantTaunt !== rivalCar.taunting && rivalTauntCool <= 0) { rivalCar.setTaunt(wantTaunt); rivalTauntCool = 1.5; }
     rivalCar.setMarker(session.courier || duel.phase === 'marked' || duel.phase === 'countdown' || duel.phase === 'racing', dt);
   } else rivalCar.group.visible = false;
 
@@ -458,7 +515,7 @@ function render(alpha, dt) {
   car.group.matrixAutoUpdate = false;
   car.group.matrix.copy(basis).setPosition(pose.p);
   car.group.matrixWorldNeedsUpdate = true;
-  if (!paused) car.update(state, dt, flash);
+  if (!paused) { if (playerTauntT > 0) playerTauntT -= dt; car.setTaunt(playerTauntT > 0); car.update(state, dt, flash); }
   if (!paused && rig.view === 'chase') feedTrails(TRAIL_PLAYER, car, pose.p, pose.l, pose.u, pose.f, Math.abs(state.vf) * 3.6, state.braking, 0.22);
 
   for (const e of pendingSparks) {

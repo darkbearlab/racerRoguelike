@@ -1,0 +1,66 @@
+{
+  "_note": "車輛外觀：塗裝花樣、配色、車底燈、車後投影。全部是原創圖樣，不對應任何真實車隊或品牌。",
+  "liveries": [
+    { "id": "solid", "name": "單色", "p": 0 },
+    { "id": "twin", "name": "雙條紋", "p": 1 },
+    { "id": "twotone", "name": "上下雙色", "p": 2 },
+    { "id": "slash", "name": "車尾斜紋", "p": 3 },
+    { "id": "fade", "name": "前後漸層", "p": 4 },
+    { "id": "offset", "name": "偏置條紋", "p": 5 },
+    { "id": "checker", "name": "車尾方格", "p": 6 }
+  ],
+  "bodies": [
+    { "name": "原廠色", "color": null },
+    { "name": "午夜藍", "color": "#1d4fd0" },
+    { "name": "警示黃", "color": "#e8c21c" },
+    { "name": "火焰橘", "color": "#c85a12" },
+    { "name": "競技紅", "color": "#c2181e" },
+    { "name": "珍珠白", "color": "#ecece6" },
+    { "name": "消光黑", "color": "#16181d" },
+    { "name": "薄荷綠", "color": "#3ac8a0" },
+    { "name": "葡萄紫", "color": "#6a2ab8" },
+    { "name": "櫻花粉", "color": "#ff7ab0" },
+    { "name": "槍鐵灰", "color": "#5a6068" }
+  ],
+  "accents": [
+    { "name": "白", "color": "#f2f2f0" },
+    { "name": "黑", "color": "#101014" },
+    { "name": "黃", "color": "#f0c818" },
+    { "name": "紅", "color": "#d8202a" },
+    { "name": "青", "color": "#18b8d8" },
+    { "name": "粉", "color": "#ff5aa8" },
+    { "name": "綠", "color": "#58d848" },
+    { "name": "橘", "color": "#ff7a18" }
+  ],
+  "leds": [
+    { "name": "關閉", "color": null },
+    { "name": "冰藍", "color": "#30c8ff" },
+    { "name": "紫", "color": "#a040ff" },
+    { "name": "萊姆", "color": "#70ff40" },
+    { "name": "粉紅", "color": "#ff40a0" },
+    { "name": "琥珀", "color": "#ffa020" },
+    { "name": "白", "color": "#e8f0ff" },
+    { "name": "紅", "color": "#ff2030" }
+  ],
+  "emblems": [
+    { "name": "關閉", "glyph": null },
+    { "name": "狼", "glyph": "狼" },
+    { "name": "龍", "glyph": "龍" },
+    { "name": "鬼", "glyph": "鬼" },
+    { "name": "雷", "glyph": "雷" },
+    { "name": "夜", "glyph": "夜" },
+    { "name": "風", "glyph": "風" },
+    { "name": "星", "glyph": "★" },
+    { "name": "黑桃", "glyph": "♠" }
+  ],
+  "taunts": ["😜", "😎", "👋", "💨", "😏", "🤣", "👻", "🔥", "💤", "🐢", "👅", "🫵"],
+  "playerDefault": { "body": 0, "livery": 1, "accent": 0, "led": 1, "emblem": 1 },
+  "rivals": {
+    "yasha": { "livery": "slash", "color2": "#101014", "led": "#ff2030" },
+    "typhoon": { "livery": "twin", "color2": "#1a50d0", "led": "#30c8ff" },
+    "akatsuki": { "livery": "fade", "color2": "#c01020", "led": "#a040ff" },
+    "mystery": { "livery": "solid", "led": "#a040ff", "glyph": "？" },
+    "patrol": { "livery": "twotone", "color2": "#101014", "led": null, "glyph": null },
+    "courier": { "livery": "solid", "led": null, "glyph": null }
+  }
+}
