@@ -21,7 +21,7 @@ const GEARS = [0, 60, 105, 150, 195, 235, 300];
 const BGM_BASE = `${import.meta.env.BASE_URL}audio/bgm/`;
 const BGM = bgmList.pool;
 const MIN_RATE = 0.08;    // <audio> 播放速度的下限（瀏覽器低於 0.0625 會出錯）
-const MUSIC_LEVEL = 0.5;  // 音樂音量滑桿拉滿時的實際增益
+const MUSIC_LEVEL = 0.8;  // 音樂音量滑桿拉滿時的實際增益
 const ENGINE_LEVEL = 0.34; // 合成器全油門時約 −9 dBFS，會蓋掉所有錄音，所以壓下來
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const pick = (list, last) => { let v; do v = list[Math.floor(Math.random() * list.length)]; while (list.length > 1 && v === last); return v; };
@@ -47,7 +47,7 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
   const live = new Set();   // 正在播的錄音（含循環的），時間變慢時一起降速
   const bufs = {};
   const armed = new WeakMap();
-  let volume = 0.8, muted = false, suspended = false;
+  let volume = 0.8, sfxVol = 0.8, fxBus = null, muted = false, suspended = false;
   let gear = 1, shiftCool = 0, hitCool = 0, passCool = 0, lastLight = '', lastPass = '', lastShift = '', rivalSide = 0, over = false;
   const stats = { hits: 0, passes: 0, shifts: 0, rpm: 0, gear: 1, loaded: 0, scrape: 0, track: '', tracks: 0 };
 
@@ -134,6 +134,7 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
     if (!master) return;
     master.gain.setTargetAtTime(muted ? 0 : volume, ctx.currentTime, 0.05);
     bgmBus.gain.setTargetAtTime(musicVol * MUSIC_LEVEL, ctx.currentTime, 0.05);
+    fxBus.gain.setTargetAtTime(sfxVol, ctx.currentTime, 0.05);
   }
 
   function hit(e, isCar) {
@@ -173,6 +174,9 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
     set muted(v) { muted = !!v; applyVolume(); },
     get deck() { return cur; },       // 除錯用：目前這一首
     get decks() { return decks; },
+    /** 音效音量（引擎、撞擊、環境聲…音樂以外的全部） */
+    get sfxVolume() { return sfxVol; },
+    set sfxVolume(v) { sfxVol = clamp(v, 0, 1); applyVolume(); },
     get musicVolume() { return musicVol; },
     set musicVolume(v) { musicVol = clamp(v, 0, 1); applyVolume(); },
     /** 跳到下一首：目前這首很快淡掉，下一首直接開始 */
@@ -191,7 +195,8 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
       master.connect(lim); lim.connect(ctx.destination);
       api.out = lim; // 除錯用：從這裡接分析器量實際輸出
       // 時間倍率用的兩個增益：世界慢到快停時把聲音收掉（音高已經掉到底，留著只剩低頻轟轟聲）
-      timeBus = ctx.createGain(); timeBus.connect(master);
+      fxBus = ctx.createGain(); fxBus.gain.value = sfxVol; fxBus.connect(master);
+      timeBus = ctx.createGain(); timeBus.connect(fxBus);
       bgmTime = ctx.createGain(); bgmTime.connect(master);
       sfxBus = ctx.createGain(); sfxBus.connect(timeBus);
       engBus = ctx.createGain(); engBus.gain.value = 0; engBus.connect(timeBus);

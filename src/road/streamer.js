@@ -465,6 +465,7 @@ export function createStreamer(scene, road, renderer, seed) {
   const m4 = new THREE.Matrix4();
   const propColor = new THREE.Color();
   const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+  const v3s = new THREE.Vector3();
   const vX = new THREE.Vector3(), vY = new THREE.Vector3(), vZ = new THREE.Vector3();
   const q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
   const stats = { built: 0, lastBuildMs: 0, maxBuildMs: 0, active: 0 };
@@ -789,6 +790,22 @@ export function createStreamer(scene, road, renderer, seed) {
     /** 玩家選了另一條分支：分歧點之後的 chunk 交換標籤；分歧點所在的那一塊要重建 */
     onSwap(forkS) {
       const cFork = Math.floor(forkS / DS / CH);
+      // 遠景建築只掛在主線那一塊上。換邊之後原本的主線會被回收，建築要先搬到玩家走的這一條，
+      // 否則兩旁的高樓會整批消失，要開到新生成的路段才又出現（建築本來就避開了兩條分支，位置不用變）
+      for (const a of slots) {
+        if (a.chunk <= cFork || a.src !== 'main') continue;
+        const b = find(a.chunk, 'alt');
+        if (!b) continue;
+        const dx = a.group.position.x - b.group.position.x, dy = a.group.position.y - b.group.position.y, dz = a.group.position.z - b.group.position.z;
+        for (let n = 0; n < NBUILD; n++) {
+          a.builds.getMatrixAt(n, m4);
+          if (m4.elements[5] !== 0) { m4.elements[12] += dx; m4.elements[13] += dy; m4.elements[14] += dz; }
+          b.builds.setMatrixAt(n, m4);
+          a.builds.setMatrixAt(n, ZERO);
+        }
+        a.builds.instanceMatrix.needsUpdate = true; b.builds.instanceMatrix.needsUpdate = true;
+        b.builds.boundingSphere.center.copy(a.builds.boundingSphere.center).add(v3s.set(dx, dy, dz));
+      }
       for (const sl of slots) {
         if (sl.chunk < cFork) continue;
         if (sl.chunk === cFork) sl.dirty = true;

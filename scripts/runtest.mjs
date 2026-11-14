@@ -98,6 +98,29 @@ section('Boss 連戰模式');
   check('三連勝就通關', S.over?.reason === 'victory' && S.run.bossWins === 3, `現實 ${(t / 60).toFixed(1)} 分鐘，Boss 之間各選一次成長（共 ${log.choices} 次）`);
   const L = play(4243, { forceLose: (s) => s.run.losses < 2, forceWin: (s) => s.run.losses >= 2, bossRush: true, maxSeconds: 1800 });
   check('輸了同一位 Boss 會再來挑戰', L.log.bossIntro.length === 5 && L.log.bossIntro[0] === L.log.bossIntro[2] && L.S.over?.reason === 'victory', L.log.bossIntro.join(' → '));
+  {
+    // Boss 登場：靠近後玩家被鎖住，Boss 從旁邊超過去，全程車身不重疊
+    let minGap = Infinity, locked = 0, intros = 0, moved = 0;
+    for (const seed of [21, 22, 23, 24]) {
+      const { S } = make(seed, null, true);
+      S.drawBuffs();
+      const st = S.state, inp = {}, mem = createAiMemory();
+      let d0 = null;
+      for (let t = 0; t < 40 && S.duel.phase !== 'racing'; t += DT) {
+        autopilot(st, S.playerCfg, S.road, { traffic: S.obsForPlayer, mem, dt: DT, line: true, caution: 0.85, margin: 1.25 }, inp);
+        // 故意往 Boss 那一側打方向盤：鎖住時不應該有作用
+        if (S.introLocked) { inp.steer = S.rival.st.d > st.d ? 1 : -1; if (d0 == null) d0 = st.d; moved = Math.max(moved, Math.abs(st.d - d0)); locked += DT; }
+        S.step(DT, inp);
+        if (S.rival.active && S.rival.intro) {
+          const ds = Math.abs(S.rival.st.s - st.s), dd = Math.abs(S.rival.st.d - st.d);
+          if (ds < 4.5) minGap = Math.min(minGap, dd);
+        }
+      }
+      if (S.duel.phase === 'racing' || S.duel.phase === 'countdown' || (S.rival.active && !S.rival.intro)) intros++;
+    }
+    check('Boss 登場時鎖定玩家操作', locked > 2 && moved < 0.6, `四局共鎖 ${locked.toFixed(1)} 秒，硬打方向盤最多偏 ${moved.toFixed(2)} m`);
+    check('Boss 登場不穿過玩家的車', intros === 4 && minGap > 1.9, `並排時橫向最近 ${minGap.toFixed(2)} m（車寬約 1.8 m）`);
+  }
   for (const seed of [11, 12, 13]) {
     const R = play(seed, { bossRush: true, maxSeconds: 3600 });
     const d = R.log.duels;

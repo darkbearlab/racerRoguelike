@@ -303,7 +303,7 @@ function autoMenu() {
 let started = AUTOPILOT;
 let titleTime = 0;
 const btnStart = document.getElementById('btnStart'), btnSettings = document.getElementById('btnSettings'), settingsEl = document.getElementById('settings');
-const optMirror = document.getElementById('optMirror'), optRubber = document.getElementById('optRubber'), optGfx = document.getElementById('optGfx'), optWet = document.getElementById('optWet'), optBlur = document.getElementById('optBlur'), optVol = document.getElementById('optVol'), optMusic = document.getElementById('optMusic');
+const optMirror = document.getElementById('optMirror'), optRubber = document.getElementById('optRubber'), optGfx = document.getElementById('optGfx'), optWet = document.getElementById('optWet'), optBlur = document.getElementById('optBlur'), optVol = document.getElementById('optVol'), optMusic = document.getElementById('optMusic'), optSfx = document.getElementById('optSfx');
 try {
   const saved = JSON.parse(localStorage.getItem('settings') || '{}');
   if (typeof saved.mirror === 'boolean') camCfg.mirror = saved.mirror;
@@ -313,6 +313,7 @@ try {
   if (saved.blur === false && !params.get('blur')) gfx.blur = false;
   if (typeof saved.vol === 'number') audio.volume = saved.vol;
   if (typeof saved.music === 'number') audio.musicVolume = saved.music;
+  if (typeof saved.sfx === 'number') audio.sfxVolume = saved.sfx;
 } catch { /* 讀不到就用預設值 */ }
 optMirror.checked = !!camCfg.mirror;
 optRubber.checked = !!duelCfg.rubberBand.enabled;
@@ -321,6 +322,7 @@ optWet.checked = gfx.wet;
 optBlur.checked = gfx.blur;
 optVol.value = String(Math.round(audio.volume * 100));
 optMusic.value = String(Math.round(audio.musicVolume * 100));
+optSfx.value = String(Math.round(audio.sfxVolume * 100));
 applyGfx();
 const saveSettings = () => {
   camCfg.mirror = optMirror.checked;
@@ -330,8 +332,9 @@ const saveSettings = () => {
   gfx.blur = optBlur.checked;
   audio.volume = Number(optVol.value) / 100;
   audio.musicVolume = Number(optMusic.value) / 100;
+  audio.sfxVolume = Number(optSfx.value) / 100;
   applyGfx();
-  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, rubber: duelCfg.rubberBand.enabled, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume })); } catch { /* 存不了就算了 */ }
+  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, rubber: duelCfg.rubberBand.enabled, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume })); } catch { /* 存不了就算了 */ }
 };
 optMirror.addEventListener('change', saveSettings);
 optRubber.addEventListener('change', saveSettings);
@@ -340,6 +343,7 @@ optWet.addEventListener('change', saveSettings);
 optBlur.addEventListener('change', saveSettings);
 optVol.addEventListener('input', saveSettings);
 optMusic.addEventListener('input', saveSettings);
+optSfx.addEventListener('input', saveSettings);
 function startRun() {
   if (started) return;
   started = true;

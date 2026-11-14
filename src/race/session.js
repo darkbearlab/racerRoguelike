@@ -103,6 +103,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
     rivalIndex: 0,
     respawnT: mode === 'loop' ? 1.5 : Infinity,
     leaveT: 0,
+    introLocked: false,  // Boss 登場中，玩家操作被鎖住
     gridV: 0, gridD: 0,  // 倒數期間兩台車被鎖定的共同速度、玩家保持的橫向位置
     clearT: 0,           // 還要淨空車流幾秒（倒數＋開賽後一小段）
     cleared: 0,          // 這場對決開賽前收掉幾台車（除錯與測試用）
@@ -234,7 +235,25 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       }
       // ── 對決倒數：玩家的操作鎖住，由系統保持車道、定速前進，直到出現 BATTLE
       const grid = duel.phase === 'countdown' && !menu;
-      if (grid) { inp = drive(state, playerCfg, road, { obstacles: NONE, dTarget: S.gridD, dt, speedCap: S.gridV }, gridAi.input); inp.steer = 0; inp.handbrake = false; }
+      // ── Boss 登場：Boss 追到後方不遠處起，玩家的操作同樣鎖住（保持車道與車速），等它從旁邊超過去才放開。
+      //    這樣 Boss 走的那條車道不會被玩家切進來，也就不會從玩家的車身穿過去
+      const introLock = !grid && !menu && rival.active && rival.intro && !rival.onAlt && rival.st.s - state.s > -(runCfg?.boss?.lockBehind ?? 45);
+      if (introLock && !S.introLocked) {
+        const lim = road.halfWidth - 1.3;
+        S.gridV = Math.max(60 / 3.6, state.vf); S.gridD = Math.min(lim, Math.max(-lim, state.d));
+      }
+      S.introLocked = introLock;
+      const lock = grid || introLock;
+      let lockV = S.gridV;
+      if (introLock) {
+        // 鎖住時沒辦法閃車：前面同車道有慢車就跟著它的速度
+        for (const c of traffic.cars) {
+          if (!c.active || c.onAlt || Math.abs(c.d - state.d) > 2.3) continue;
+          const gap = c.s - state.s - (c.len + 4.4) / 2;
+          if (gap > -1 && gap < 10 + state.vf * 1.2 && c.v < lockV) lockV = c.v;
+        }
+      }
+      if (lock) { inp = drive(state, playerCfg, road, { obstacles: NONE, dTarget: S.gridD, dt, speedCap: lockV }, gridAi.input); inp.steer = 0; inp.handbrake = false; }
       // 對手在倒數時的目標速度：前兩秒多用速差把距離收到「領先一兩個車身」，最後不到一秒回到完全等速
       let gridTarget = null;
       if (grid && rival.active) {
@@ -261,8 +280,8 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       state.dragMul = S.slip ? 1 - Math.min(0.9, playerCfg.slipstreamDragCut) : 1;
       stepCar(state, inp, playerCfg, road, dt, ev);
       // 強制等速：不管原本開多快，倒數時直接把車速拉到鎖定值
-      if (grid) {
-        state.vf += Math.min(14 * dt, Math.max(-14 * dt, S.gridV - state.vf));
+      if (lock) {
+        state.vf += Math.min(14 * dt, Math.max(-14 * dt, lockV - state.vf));
         // 橫向也鎖住：車頭回正、慢慢靠回開始倒數時的位置
         const k = Math.min(1, 18 * dt);   // 要夠硬：彎道上方向盤回正的車會被甩向外側
         state.psi -= state.psi * k; state.vl -= state.vl * k; state.yawRate = 0; state.steer -= state.steer * k;
@@ -305,6 +324,15 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
           jctSide: f ? (flow.chosen ? f.side : state.d > 0 ? 1 : -1) : 0,
           courier: S.courier,
         });
+        // Boss 登場的保險：還沒完全錯開車道就追到玩家車尾時，先等速跟著，錯開了才超
+        if (rival.intro && !onAlt) {
+          // 登場是演出：橫向位置由這裡直接帶，固定走玩家旁邊隔一個車身的位置（靠路中央那一側）
+          const lim = road.halfWidth - 1.3;
+          const side = Math.min(lim, Math.max(-lim, state.d + (state.d > 0 ? -3.6 : 3.6)));
+          rs.d += Math.min(4.5 * dt, Math.max(-4.5 * dt, side - rs.d));
+          rs.psi -= rs.psi * Math.min(1, 10 * dt); rs.vl = 0; rival.proxy.d = rs.d;
+        }
+        if (rival.intro && !onAlt && Math.abs(rs.d - state.d) < 2.2 && rs.s - state.s > -9.5 && rs.s - state.s < 5) { rs.vf = Math.min(rs.vf, state.vf); rival.proxy.v = rs.vf; }
         if (gridTarget != null) { rs.vf += Math.min(16 * dt, Math.max(-16 * dt, gridTarget - rs.vf)); rival.proxy.v = rs.vf; }
       } else { rival.proxy.active = false; rival.proxy.onAlt = false; }
 
