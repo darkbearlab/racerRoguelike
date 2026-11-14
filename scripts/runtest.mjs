@@ -152,6 +152,12 @@ section('一對多：警車事件三台同場');
     packDefs ? all().map((x) => `前方 ${(x.st.s - st.s).toFixed(0)} m`).join('、') : '沒有出現');
   run(60, () => S.duel.phase === 'racing');
   const racing = S.duel.phase === 'racing';
+  {
+    // 開戰那一刻三台都要在得分門檻（40 m）以內：不能一喊 BATTLE 對方就開始拿分
+    const lead = Math.max(...all().map((x) => x.st.s - st.s));
+    let early = 0; for (let i = 0; i < 30; i++) { S.step(DT, inp); if (S.duel.scoring === -1) early++; }
+    check('一對多：開戰時最前面那台也在得分門檻內', racing && lead < dcfg.threshold - 5 && early === 0 && S.duel.scoreR === 0, `最前面領先 ${lead.toFixed(0)} m（門檻 ${dcfg.threshold} m）`);
+  }
   // 直接擺位置驗規則：超過兩台、還有一台在前面 → 玩家不得分；三台都在後面才得分
   const place = (offs) => { all().forEach((x, i) => { x.st.s = st.s + offs[i]; x.prev.s = x.st.s; x.proxy.s = x.st.s; x.st.vf = st.vf; }); };
   const scoreAfter = (offs) => { const p0 = S.duel.scoreP; let sc = 0; for (let i = 0; i < 60; i++) { place(offs); S.step(DT, inp); sc = S.duel.scoring; } return { gain: S.duel.scoreP - p0, sc }; };

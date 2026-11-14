@@ -380,7 +380,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         const x = pack[k];
         if (!x.active) { x.proxy.active = false; continue; }
         let gt = null;
-        if (grid) gt = S.gridV + (duel.timer > 0.8 ? Math.min(8, Math.max(-8, (state.s + 28 + 16 * k - x.st.s) * 0.8)) : 0);
+        if (grid) gt = S.gridV + (duel.timer > 0.8 ? Math.min(8, Math.max(-8, (state.s + 16 + 7 * k - x.st.s) * 0.8)) : 0);
         updateRival(x, dt, {
           road, obstacles: obsForPack[k], player: playerProxy, phase: duel.phase, matchRange: duelCfg.matchRange, challengeRange: duelCfg.challengeRange, gridTarget: gt,
           slip: traffic.slipstream(x.st, x.cfg.slipstreamRange, x.cfg.slipstreamWidth, playerProxy), jctSide: 0,
