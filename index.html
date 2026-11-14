@@ -110,6 +110,19 @@
   #bossCard.on { opacity: 1; }
   #bossCard .bt { font-size: 15px; letter-spacing: 10px; color: #ffb8a0; }
   #bossCard .bn { font-size: 68px; font-weight: 800; letter-spacing: 20px; color: #fff; text-shadow: 0 0 26px #ff3020; }
+  /* 無線電：對手喊話。放右上、對手分數條下面，不擋路面 */
+  #radio { position: absolute; right: 16px; top: calc(92px + var(--mh, 0px)); width: 300px; display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px;
+           background: rgba(8,12,20,.78); border: 1px solid rgba(150,200,255,.45); border-left: 3px solid #7fd0ff; border-radius: 4px;
+           opacity: 0; transform: translateX(16px); transition: opacity .2s, transform .2s; pointer-events: none; }
+  #radio.on { opacity: 1; transform: none; }
+  #radioFace { flex: 0 0 46px; height: 46px; border: 2px solid #7fd0ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; background: rgba(0,0,0,.45); }
+  #radioHead { font-size: 11px; letter-spacing: 2px; opacity: .75; display: flex; align-items: center; gap: 6px; }
+  #radioHead i { display: inline-block; width: 3px; background: #7fd0ff; animation: rwave .5s infinite alternate; }
+  #radioHead i:nth-child(1) { height: 5px; } #radioHead i:nth-child(2) { height: 10px; animation-delay: .12s; } #radioHead i:nth-child(3) { height: 7px; animation-delay: .24s; }
+  @keyframes rwave { to { transform: scaleY(.3); } }
+  #radioName { font-size: 14px; font-weight: 700; letter-spacing: 2px; margin: 1px 0 2px; }
+  #radioText { font-size: 15px; line-height: 1.45; letter-spacing: 1px; min-height: 22px; }
+  .menu-open #radio { display: none; }
   #bossCard .bb { font-size: 13px; letter-spacing: 2px; margin-top: 10px; color: #ffd9a0; opacity: .9; }
   #bossCard .bl { font-size: 18px; letter-spacing: 3px; margin-top: 6px; opacity: .92; }
   #night { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -174,6 +187,7 @@
 <div id="hud">
   <pre id="debug"></pre>
   <div id="run"><div class="nightLine" id="nightLine"></div>擊敗 <b id="defeats">0</b>　賞金 <b id="bounty">0</b><div id="runNote"></div><div id="owned"></div></div>
+  <div id="radio"><div id="radioFace"></div><div><div id="radioHead"><i></i><i></i><i></i>RADIO</div><div id="radioName"></div><div id="radioText"></div></div></div>
   <div id="bossCard"><div class="bt" id="bossTitle"></div><div class="bn" id="bossName"></div><div class="bl" id="bossLine"></div><div class="bb" id="bossBuffs"></div></div>
   <div id="night"><div id="nightNo"></div><b id="nightZone"></b></div>
   <div id="menu"><div id="menuTitle"></div><div id="menuBody"></div><div id="menuHint"></div><div id="menuTrack"><div id="menuBar"></div></div></div>

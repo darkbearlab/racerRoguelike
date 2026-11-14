@@ -9,6 +9,8 @@ import runJson from './config/run.json';
 import upgradesJson from './config/upgrades.json';
 import modelsJson from './config/models.json';
 import looksJson from './config/looks.json';
+import radioJson from './config/radio.json';
+import { createRadio } from './ui/radio.js';
 import { createRng } from './core/rng.js';
 import { createEvents } from './core/events.js';
 import { createLoop } from './core/time.js';
@@ -239,8 +241,11 @@ events.on('bossIntro', (e) => {
   rivalCar.marker.material.color.setRGB(3.4, 2.4, 0.3); // Boss 的標記是金色
   hud.bossCard(e.def, e.def.radio?.intro, 6, `${e.def.chassis || ''}　${buffText(e.def)}`);
 });
-events.on('duelApplied', (e) => {
-  if (e.def.tier === 'boss') setTimeout(() => hud.bossCard(e.def, e.win ? e.def.radio?.lose : e.def.radio?.win, 3.5), 2000);
+// 無線電：對手在對決中的喊話（頭像用車後投影的那個標誌）
+const radio = createRadio({
+  events, duel, rival, cfg: radioJson,
+  glyphOf: (def) => { const l = rivalLook(def); return { glyph: l.glyph || def.name[0], color: l.led || '#7fd0ff' }; },
+  onSpeak: () => audio.radioBlip(),
 });
 events.on('nightStart', (e) => hud.night(e.night, e.zone.name));
 events.on('rushBuffs', (e) => setTimeout(() => hud.toast(`抽到的強化：${e.list.map((d) => d.name).join('、')}`, 6), 2400));
@@ -619,6 +624,7 @@ function render(alpha, dt) {
   hud.run(session.run, nodeLabel, session.nights ? { night: session.run.night, zoneName: session.zoneName, need: runCfg.boss.afterDefeats, rush: session.bossRush, total: session.nights.length } : null);
   hud.clock(clock);
   choiceUi.update(menus, session.run, upgrades);
+  if (started && !paused) radio.update(dt);
   setDaylight(clock.progress);
   const toFork = flow.forkS - state.s;
   if (!flow.chosen && flow.options && toFork < 800 && toFork > -5) {

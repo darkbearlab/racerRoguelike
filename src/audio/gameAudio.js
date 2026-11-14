@@ -179,6 +179,21 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
     set sfxVolume(v) { sfxVol = clamp(v, 0, 1); applyVolume(); },
     get musicVolume() { return musicVol; },
     set musicVolume(v) { musicVol = clamp(v, 0, 1); applyVolume(); },
+    /** 無線電開口前的一聲「喀沙」：一小段帶通雜訊加一個短嗶 */
+    radioBlip() {
+      if (!ctx || suspended) return;
+      const t = ctx.currentTime, n = Math.floor(ctx.sampleRate * 0.16);
+      const buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 1.2;
+      const g = ctx.createGain(); g.gain.value = 0.22;
+      src.connect(bp); bp.connect(g); g.connect(sfxBus); src.start(t);
+      const o = ctx.createOscillator(), og = ctx.createGain();
+      o.type = 'square'; o.frequency.value = 1320;
+      og.gain.setValueAtTime(0.0001, t + 0.03); og.gain.linearRampToValueAtTime(0.05, t + 0.04); og.gain.linearRampToValueAtTime(0.0001, t + 0.12);
+      o.connect(og); og.connect(sfxBus); o.start(t + 0.03); o.stop(t + 0.14);
+    },
     /** 跳到下一首：目前這首很快淡掉，下一首直接開始 */
     nextTrack() { if (bgmBus && BGM.length > 1 && cur && !suspended) { fadeOut(cur, 0.6); startTrack(0.3); } },
 
