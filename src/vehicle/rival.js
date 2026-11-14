@@ -43,7 +43,7 @@ export function spawnRival(r, def, road, s, lane) {
 }
 
 /**
- * ctx: { road（對手所在的分支）, obstacles, player:{s,d,v}, phase(對決階段), rubber, slip, jctSide(玩家選的那一側) }
+ * ctx: { road（對手所在的分支）, obstacles, player:{s,d,v}, phase(對決階段), slip, jctSide(玩家選的那一側) }
  */
 export function updateRival(r, dt, ctx) {
   if (!r.active) return;
@@ -108,9 +108,9 @@ export function updateRival(r, dt, ctx) {
     if (ctx.gridTarget != null) { o.speedCap = ctx.gridTarget; o.topSpeedKmh = Math.max(def.topSpeedKmh, ctx.gridTarget * 3.6 + 10); r.mem.hold = 1; }
   } else if (r.mode === 'race') {
     o.line = true;
-    // 橡皮筋（可關閉）：落後時極速略增、領先時略減
+    // 成長「不服輸」：只在落後時極速提高，領先時沒有效果（單向的橡皮筋，要抽到才有）
     let top = def.topSpeedKmh;
-    if (ctx.rubber?.enabled) top *= ahead < 0 ? ctx.rubber.behind : ctx.rubber.ahead;
+    if (ahead < 0 && def.car?.comebackTop) top *= 1 + def.car.comebackTop;
     o.topSpeedKmh = top;
     r.cfg.vMaxKmh = top;
 

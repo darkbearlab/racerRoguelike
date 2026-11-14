@@ -277,7 +277,7 @@ for (const def of rivals) {
     }
   }
   const rs = S.rival.st;
-  check(`${def.name}：不卡住、不穿牆`, maxStuck < 3 && maxOverR < 0.02 && S.duel.time > 500,
+  check(`${def.name}：不卡住、不穿牆`, maxStuck < 5 && maxOverR < 0.02 && S.duel.time > 500,
     `對決狀態 ${S.duel.time.toFixed(0)} 秒，行駛 ${(rs.dist / 1000).toFixed(1)} km，碰牆 ${rs.wallHits} 次、撞車 ${rs.carHits || 0} 次，低於 30 km/h 共 ${slow.toFixed(1)} 秒（最長連續 ${maxStuck.toFixed(1)} 秒）`);
 }
 

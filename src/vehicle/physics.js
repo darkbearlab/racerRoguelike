@@ -38,8 +38,10 @@ export function engineRefSpeed(cfg) {
 }
 
 export function stepCar(st, input, cfg, road, dt, events) {
-  const vMax = cfg.vMaxKmh / 3.6;
-  const vEng = engineRefSpeed(cfg);
+  // topMul：暫時的極速倍率（成長「不服輸」：對決中落後時），連引擎曲線一起放大
+  const tm = st.topMul || 1;
+  const vMax = cfg.vMaxKmh * tm / 3.6;
+  const vEng = engineRefSpeed(cfg) * tm;
   const throttle = clamp(input.throttle || 0, 0, 1);
   const brake = clamp(input.brake || 0, 0, 1);
   const handbrake = !!input.handbrake;

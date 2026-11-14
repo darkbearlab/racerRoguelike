@@ -1,4 +1,5 @@
 {
+  "_note": "topSpeedKmh / power / car 是這位對手的原廠數值；實際上場的數值 = 原廠 + buffs（固定）+ randomBuffs（每次登場隨機抽，和玩家同一套成長）。一般對手的隨機 buff 數量看是第幾晚（run.json 的 rivalBuffs）。Boss 的底盤就是玩家可選的三台起始車。",
   "list": [
     {
       "id": "greywolf", "model": "hatch", "name": "灰狼", "tier": "normal", "color": "#8d9299",
@@ -77,23 +78,29 @@
     },
     {
       "id": "yasha", "model": "bossCorner", "name": "夜叉", "title": "彎道之王", "tier": "boss", "color": "#b01030",
-      "topSpeedKmh": 202, "power": 4.6, "cruiseKmh": 125,
+      "topSpeedKmh": 178, "power": 4.6, "cruiseKmh": 125,
       "cornerSkill": 1.0, "aggression": 0.9, "block": 0.45, "mistake": 0,
-      "special": "cornerKing", "car": { "latAccelMax": 20.5, "grip": 10 },
+      "special": "cornerKing", "chassis": "輕量掀背",
+      "car": { "latAccelMax": 18, "grip": 9.0, "steerLow": 2.4, "steerHigh": 0.8, "brakeDecel": 9.4 },
+      "buffs": ["semi_slicks", "semi_slicks", "tall_gears", "tall_gears", "tall_gears"], "randomBuffs": 2,
       "radio": { "intro": "環狀線是我的地盤。跟得上再說。", "win": "彎道裡，沒有人贏得了我。", "lose": "……竟然在彎道輸了。" }
     },
     {
       "id": "typhoon", "model": "bossSpeed", "name": "颶風", "title": "極速怪物", "tier": "boss", "color": "#f0f0f4",
-      "topSpeedKmh": 232, "power": 5.3, "cruiseKmh": 130,
+      "topSpeedKmh": 208, "power": 4.0, "cruiseKmh": 130,
       "cornerSkill": 0.8, "aggression": 0.85, "block": 0.3, "mistake": 0.05,
+      "chassis": "大排氣量轎跑",
+      "car": { "latAccelMax": 14.5, "grip": 7.2, "steerLow": 2.0, "steerHigh": 0.62, "brakeDecel": 7.8, "slipstreamDragCut": 0.42 },
+      "buffs": ["tall_gears", "tall_gears", "tall_gears", "tall_gears", "turbo", "turbo", "turbo", "turbo"], "randomBuffs": 2,
       "special": "nitro", "nitro": { "seconds": 3.5, "cooldown": 9, "accel": 5, "topMul": 1.08, "straightAhead": 260 },
       "radio": { "intro": "直線上，你只看得到我的尾燈。", "win": "太慢了。", "lose": "……引擎，還不夠。" }
     },
     {
       "id": "akatsuki", "model": "bossFinal", "name": "曉", "title": "終極對手", "tier": "boss", "color": "#101014",
-      "topSpeedKmh": 226, "power": 5.0, "cruiseKmh": 130,
+      "topSpeedKmh": 190, "power": 4.2, "cruiseKmh": 130,
       "cornerSkill": 0.97, "aggression": 1.0, "block": 1.0, "mistake": 0,
-      "special": "blocker", "car": { "latAccelMax": 18 },
+      "special": "blocker", "chassis": "標準雙門", "car": {},
+      "buffs": ["tall_gears", "tall_gears", "tall_gears", "turbo", "turbo", "turbo", "semi_slicks", "semi_slicks", "last_resort"], "randomBuffs": 3,
       "radio": { "intro": "天亮之前，你過不了我這一關。", "win": "回去吧。天要亮了。", "lose": "……這條路，交給你了。" }
     }
   ]

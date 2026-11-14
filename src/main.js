@@ -230,12 +230,14 @@ events.on('carHit', (e) => {
 events.on('rivalMarked', (e) => {
   dressRival(e.def, 'hatch');
   if (e.def.tier === 'police') rivalCar.marker.material.color.setRGB(0.5, 1.0, 3.4); else rivalCar.marker.material.color.setRGB(3.2, 0.5, 0.25);
-  hud.toast(`對手出現：${e.def.name}`, 2.2);
+  hud.toast(`對手出現：${e.def.name}${buffText(e.def) ? `　${buffText(e.def)}` : ''}`, 3);
 });
+// 對手身上的 buff 清單（和玩家同一套成長）
+const buffText = (def) => (def.buffList || []).map((it) => it.def.name + (it.count > 1 ? `×${it.count}` : '')).join('・');
 events.on('bossIntro', (e) => {
   dressRival(e.def, 'gt');
   rivalCar.marker.material.color.setRGB(3.4, 2.4, 0.3); // Boss 的標記是金色
-  hud.bossCard(e.def, e.def.radio?.intro);
+  hud.bossCard(e.def, e.def.radio?.intro, 6, `${e.def.chassis || ''}　${buffText(e.def)}`);
 });
 events.on('duelApplied', (e) => {
   if (e.def.tier === 'boss') setTimeout(() => hud.bossCard(e.def, e.win ? e.def.radio?.lose : e.def.radio?.win, 3.5), 2000);
@@ -303,11 +305,10 @@ function autoMenu() {
 let started = AUTOPILOT;
 let titleTime = 0;
 const btnStart = document.getElementById('btnStart'), btnSettings = document.getElementById('btnSettings'), settingsEl = document.getElementById('settings');
-const optMirror = document.getElementById('optMirror'), optRubber = document.getElementById('optRubber'), optGfx = document.getElementById('optGfx'), optWet = document.getElementById('optWet'), optBlur = document.getElementById('optBlur'), optVol = document.getElementById('optVol'), optMusic = document.getElementById('optMusic'), optSfx = document.getElementById('optSfx');
+const optMirror = document.getElementById('optMirror'), optGfx = document.getElementById('optGfx'), optWet = document.getElementById('optWet'), optBlur = document.getElementById('optBlur'), optVol = document.getElementById('optVol'), optMusic = document.getElementById('optMusic'), optSfx = document.getElementById('optSfx');
 try {
   const saved = JSON.parse(localStorage.getItem('settings') || '{}');
   if (typeof saved.mirror === 'boolean') camCfg.mirror = saved.mirror;
-  if (typeof saved.rubber === 'boolean') duelCfg.rubberBand.enabled = saved.rubber;
   if (saved.gfx === 'low' && !params.get('gfx')) gfx.quality = 'low';
   if (saved.wet === false && !params.get('wet')) gfx.wet = false;
   if (saved.blur === false && !params.get('blur')) gfx.blur = false;
@@ -316,7 +317,6 @@ try {
   if (typeof saved.sfx === 'number') audio.sfxVolume = saved.sfx;
 } catch { /* 讀不到就用預設值 */ }
 optMirror.checked = !!camCfg.mirror;
-optRubber.checked = !!duelCfg.rubberBand.enabled;
 optGfx.checked = gfx.quality !== 'low';
 optWet.checked = gfx.wet;
 optBlur.checked = gfx.blur;
@@ -326,7 +326,6 @@ optSfx.value = String(Math.round(audio.sfxVolume * 100));
 applyGfx();
 const saveSettings = () => {
   camCfg.mirror = optMirror.checked;
-  duelCfg.rubberBand.enabled = optRubber.checked;
   gfx.quality = optGfx.checked ? 'high' : 'low';
   gfx.wet = optWet.checked;
   gfx.blur = optBlur.checked;
@@ -334,10 +333,9 @@ const saveSettings = () => {
   audio.musicVolume = Number(optMusic.value) / 100;
   audio.sfxVolume = Number(optSfx.value) / 100;
   applyGfx();
-  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, rubber: duelCfg.rubberBand.enabled, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume })); } catch { /* 存不了就算了 */ }
+  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume })); } catch { /* 存不了就算了 */ }
 };
 optMirror.addEventListener('change', saveSettings);
-optRubber.addEventListener('change', saveSettings);
 optGfx.addEventListener('change', saveSettings);
 optWet.addEventListener('change', saveSettings);
 optBlur.addEventListener('change', saveSettings);

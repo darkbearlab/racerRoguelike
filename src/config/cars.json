@@ -34,6 +34,7 @@
     "slipstreamRange": 30,
     "slipstreamWidth": 1.5,
     "slipstreamDragCut": 0.35,
+    "comebackTop": 0,
 
     "halfWidth": 0.9,
     "halfLength": 2.2

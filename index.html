@@ -110,6 +110,7 @@
   #bossCard.on { opacity: 1; }
   #bossCard .bt { font-size: 15px; letter-spacing: 10px; color: #ffb8a0; }
   #bossCard .bn { font-size: 68px; font-weight: 800; letter-spacing: 20px; color: #fff; text-shadow: 0 0 26px #ff3020; }
+  #bossCard .bb { font-size: 13px; letter-spacing: 2px; margin-top: 10px; color: #ffd9a0; opacity: .9; }
   #bossCard .bl { font-size: 18px; letter-spacing: 3px; margin-top: 6px; opacity: .92; }
   #night { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
            background: #03050a; opacity: 0; transition: opacity .9s; pointer-events: none; }
@@ -173,7 +174,7 @@
 <div id="hud">
   <pre id="debug"></pre>
   <div id="run"><div class="nightLine" id="nightLine"></div>擊敗 <b id="defeats">0</b>　賞金 <b id="bounty">0</b><div id="runNote"></div><div id="owned"></div></div>
-  <div id="bossCard"><div class="bt" id="bossTitle"></div><div class="bn" id="bossName"></div><div class="bl" id="bossLine"></div></div>
+  <div id="bossCard"><div class="bt" id="bossTitle"></div><div class="bn" id="bossName"></div><div class="bl" id="bossLine"></div><div class="bb" id="bossBuffs"></div></div>
   <div id="night"><div id="nightNo"></div><b id="nightZone"></b></div>
   <div id="menu"><div id="menuTitle"></div><div id="menuBody"></div><div id="menuHint"></div><div id="menuTrack"><div id="menuBar"></div></div></div>
   <div id="duel">
@@ -197,7 +198,6 @@
     <button class="tbtn" id="btnSettings">設定<small>Tab</small></button>
     <div id="settings">
       <label>後照鏡（畫面上方；會多畫一次場景）<input type="checkbox" id="optMirror"></label>
-      <label>橡皮筋（對手落後時略為加速）<input type="checkbox" id="optRubber"></label>
       <label>高畫質光影（關閉可提升效能）<input type="checkbox" id="optGfx"></label>
       <label>濕路面反射（需開啟高畫質光影）<input type="checkbox" id="optWet"></label>
       <label>高速時的徑向模糊（需開啟高畫質光影）<input type="checkbox" id="optBlur"></label>

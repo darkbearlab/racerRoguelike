@@ -57,6 +57,31 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
     duel: { base: duelBase, out: duel.mods },
     world: { base: { trafficDensityMul: 1 }, out: world },
   }) : null;
+  // 對手也用同一套成長：原廠數值（def）＋固定 buff ＋隨機抽的 buff → 實際上場的數值
+  const rivalStock = rivalBase ? { ...carCfg, ...rivalBase } : { ...carCfg };
+  const rivalIn = { ...rivalStock }, rivalOut = { ...rivalStock };
+  const rivalDuelBase = { threshold: duelCfg.threshold, scoreMul: 1, keepOnOvertaken: 0 };
+  const rivalUp = upgradeCfg ? createUpgrades(upgradeCfg, { car: { base: rivalIn, out: rivalOut }, duel: { base: rivalDuelBase, out: duel.rivalMods } }) : null;
+  const buffRng = createRng(seed ^ 0x6a09e667);
+  /** 把一位對手「裝好」：回傳帶著實際數值與 buff 清單的 def。extra = 額外隨機抽幾個 */
+  function dress(def, extra = 0) {
+    if (!rivalUp || def.tier === 'courier') return def;
+    for (const k of Object.keys(rivalIn)) delete rivalIn[k];
+    Object.assign(rivalIn, rivalStock, { vMaxKmh: def.topSpeedKmh, power: def.power ?? rivalStock.power }, def.car || {});
+    rivalUp.clear();
+    for (const id of def.buffs || []) rivalUp.add(id);
+    const weights = upgradeCfg.rules.rarityWeights[def.tier] || upgradeCfg.rules.rarityWeights.normal;
+    for (let n = (def.randomBuffs || 0) + extra; n > 0; n--) {
+      const pool = upgradeCfg.list.filter((d) => d.rival && rivalUp.canTake(d));
+      if (!pool.length) break;
+      let total = 0;
+      for (const d of pool) total += weights[d.rarity] || 1;
+      let r = buffRng.next() * total, pick = pool[pool.length - 1];
+      for (const d of pool) { r -= weights[d.rarity] || 1; if (r <= 0) { pick = d; break; } }
+      rivalUp.add(pick.id);
+    }
+    return { ...def, stock: { topSpeedKmh: def.topSpeedKmh, power: def.power }, topSpeedKmh: Math.round(rivalOut.vMaxKmh), power: rivalOut.power, car: { ...rivalOut }, buffList: rivalUp.list() };
+  }
   const menuAi = { mem: createAiMemory(), input: {}, cap: 40 };
   const gridAi = { input: {} };
   const clock = runCfg ? createClock(runCfg.clock) : null;
@@ -278,6 +303,8 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       // ── 玩家車（吸尾流：跟在任何車輛正後方時空氣阻力降低）
       S.slip = traffic.slipstream(state, playerCfg.slipstreamRange, playerCfg.slipstreamWidth, rival.proxy);
       state.dragMul = S.slip ? 1 - Math.min(0.9, playerCfg.slipstreamDragCut) : 1;
+      // 成長「不服輸」：對決中落後時極速提高（單向，領先時沒有效果）
+      state.topMul = duel.phase === 'racing' && rival.active && rival.st.s > state.s && playerCfg.comebackTop ? 1 + playerCfg.comebackTop : 1;
       stepCar(state, inp, playerCfg, road, dt, ev);
       // 強制等速：不管原本開多快，倒數時直接把車速拉到鎖定值
       if (lock) {
@@ -319,7 +346,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         updateRival(rival, dt, {
           road: onAlt ? S.alt : road,
           obstacles: onAlt || rival.intro ? NONE : obsForRival,
-          player: playerProxy, phase: duel.phase, rubber: duelCfg.rubberBand, matchRange: duelCfg.matchRange, challengeRange: duelCfg.challengeRange, gridTarget,
+          player: playerProxy, phase: duel.phase, matchRange: duelCfg.matchRange, challengeRange: duelCfg.challengeRange, gridTarget,
           slip: !onAlt && traffic.slipstream(rs, rival.cfg.slipstreamRange, rival.cfg.slipstreamWidth, playerProxy),
           jctSide: f ? (flow.chosen ? f.side : state.d > 0 ? 1 : -1) : 0,
           courier: S.courier,
@@ -380,12 +407,12 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
           // Boss 連戰：路上沒有別的事，隔幾秒 Boss 就從後方登場；輸了也會再來一次，直到天亮
           if (!S.pendingNight && !S.pendingChoice && !menu) {
             S.rushT -= dt;
-            if (S.rushT <= 0 && S.spawnBoss(rivals.find((r) => r.id === nights[S.run.night - 1].boss))) S.rushT = runCfg.bossRush?.nextDelay ?? 5;
+            if (S.rushT <= 0 && S.spawnBoss(dress(rivals.find((r) => r.id === nights[S.run.night - 1].boss)))) S.rushT = runCfg.bossRush?.nextDelay ?? 5;
           }
         } else if (flow.rivalPending === 'boss') {
           // Boss：過了分歧的變寬段之後，從後方登場
           if (state.s > flow.nodeStartS + runCfg.boss.spawnAfterFork) {
-            const def = rivals.find((r) => r.id === nights[S.run.night - 1].boss);
+            const def = dress(rivals.find((r) => r.id === nights[S.run.night - 1].boss));
             if (S.spawnBoss(def)) flow.rivalPending = null;
           }
         } else if (flow.rivalPending && state.s > flow.nodeStartS + 40) {
@@ -394,7 +421,8 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
           const sAt = Math.max(flow.nodeStartS + runCfg.nodes.rivalSpawnAfterFork, state.s + duelCfg.spawnAhead + Math.max(0, state.vf) * 1.5);
           // 越後面的夜晚，同一批對手的車越快
           const nt = nights ? nights[S.run.night - 1] : null, base = pool[n % pool.length];
-          const def = nt && (nt.rivalTop || nt.rivalPower) ? { ...base, topSpeedKmh: Math.round(base.topSpeedKmh * (nt.rivalTop ?? 1)), power: base.power * (nt.rivalPower ?? 1) } : base;
+          // 越後面的夜晚，對手身上隨機的 buff 越多（強敵、神秘車、警車另外再加）
+          const def = dress(base, (nt?.rivalBuffs ?? 0) + (runCfg.rivalBuffsByTier?.[base.tier] ?? 0));
           if (S.spawnRival(def, sAt)) { tierCount[flow.rivalPending] = n + 1; flow.rivalPending = null; }
         }
       } else if (duel.phase === 'marked') {
@@ -644,6 +672,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   }
   /** 基準值被熱更新後重算生效值 */
   /** 開局選車後套用：車速歸到起步速度 */
+  S.dress = dress;
   S.resetStart = () => { state.vf = mode === 'run' ? (carCfg.startKmh || 0) / 3.6 : 0; S.prev.s = state.s; };
   S.recompute = () => { duelBase.threshold = duelCfg.threshold; if (upgrades) upgrades.recompute(); else Object.assign(playerCfg, carCfg); };
   if (mode !== 'run') traffic.density = 1;

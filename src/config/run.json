@@ -14,10 +14,11 @@
     "altLength": 1600
   },
   "nights": [
-    { "zone": "loop", "boss": "yasha", "rivalTop": 1.0, "rivalPower": 1.0, "weights": { "rival": 5, "elite": 1.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } },
-    { "zone": "bay", "boss": "typhoon", "rivalTop": 1.05, "rivalPower": 1.04, "weights": { "rival": 4, "elite": 2.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } },
-    { "zone": "mixed", "boss": "akatsuki", "rivalTop": 1.10, "rivalPower": 1.08, "weights": { "rival": 3, "elite": 3.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } }
+    { "zone": "loop", "boss": "yasha", "rivalBuffs": 0, "weights": { "rival": 5, "elite": 1.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } },
+    { "zone": "bay", "boss": "typhoon", "rivalBuffs": 2, "weights": { "rival": 4, "elite": 2.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } },
+    { "zone": "mixed", "boss": "akatsuki", "rivalBuffs": 4, "weights": { "rival": 3, "elite": 3.5, "pa": 1.5, "shortcut": 1.5, "event": 1.5 } }
   ],
+  "rivalBuffsByTier": { "elite": 1, "mystery": 2, "police": 1 },
   "boss": {
     "afterDefeats": 4,
     "spawnBehind": 150,

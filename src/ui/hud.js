@@ -139,7 +139,8 @@ export function createHud(debugOn) {
     },
 
     /** Boss 登場字幕：稱號、名字、無線電台詞 */
-    bossCard(def, line, sec = 4.5) {
+    bossCard(def, line, sec = 4.5, buffs = '') {
+      $('bossBuffs').textContent = buffs;
       $('bossTitle').textContent = `♛ ${def.title || 'BOSS'}`;
       $('bossName').textContent = def.name;
       $('bossLine').textContent = line ? `「${line}」` : '';

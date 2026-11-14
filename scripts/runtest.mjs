@@ -184,10 +184,31 @@ section('Boss');
 
   // 特殊行為
   const yasha = rivals.find((r) => r.id === 'yasha'), typhoon = rivals.find((r) => r.id === 'typhoon'), akatsuki = rivals.find((r) => r.id === 'akatsuki');
-  check('彎道之王：過彎極限高於玩家', yasha.car.latAccelMax > cfg.latAccelMax * 1.2 && yasha.cornerSkill === 1,
-    `橫向加速度 ${yasha.car.latAccelMax} vs 玩家 ${cfg.latAccelMax} m/s²：半徑 100 m 的彎可用 ${(Math.sqrt(yasha.car.latAccelMax * 0.98 * 100) * 3.6).toFixed(0)} km/h 過，玩家極限 ${(Math.sqrt(cfg.latAccelMax * 100) * 3.6).toFixed(0)} km/h`);
+  // Boss = 玩家可選的起始車（原廠）＋固定 buff ＋隨機 buff，和玩家同一套成長
+  const cars = load('../src/config/cars.json');
+  const D = make(77).S.dress;
+  const dy = D(yasha), dt2 = D(typhoon), da = D(akatsuki);
+  const stockOf = (name) => ({ ...cars.player, ...cars.starters.find((s) => s.name === name).car });
+  check('Boss 的底盤就是三台起始車的原廠數值', [yasha, typhoon, akatsuki].every((b) => { const s = stockOf(b.chassis); return s.vMaxKmh === b.topSpeedKmh && s.power === b.power && (b.car.latAccelMax ?? cars.player.latAccelMax) === s.latAccelMax; }),
+    [yasha, typhoon, akatsuki].map((b) => `${b.name}＝${b.chassis} ${b.topSpeedKmh} km/h`).join('、'));
+  const nb = (d) => d.buffList.reduce((a, it) => a + it.count, 0);
+  check('Boss 帶著固定 buff 再加隨機抽的', [[yasha, dy], [typhoon, dt2], [akatsuki, da]].every(([b, d]) => nb(d) === b.buffs.length + b.randomBuffs && d.topSpeedKmh > b.topSpeedKmh),
+    [dy, dt2, da].map((d) => `${d.name} ${d.stock.topSpeedKmh}→${d.topSpeedKmh} km/h（${d.buffList.map((it) => it.def.name + (it.count > 1 ? '×' + it.count : '')).join('・')}）`).join('\n      '));
+  {
+    // 隨機抽的池子裡有「不服輸」（單向橡皮筋）：抽夠多次一定會出現
+    let got = 0, n = 0;
+    for (let k = 0; k < 60; k++) { const d = D(akatsuki); n++; if (d.car.comebackTop > 0) got++; }
+    check('Boss 有機會抽到「不服輸」（單向橡皮筋）', got > 0 && got < n, `60 次登場有 ${got} 次帶著`);
+    const night3 = D(rivals.find((r) => r.id === 'greywolf'), 4), night1 = D(rivals.find((r) => r.id === 'greywolf'), 0);
+    check('一般對手：越後面的夜晚隨機 buff 越多', nb(night1) === 0 && nb(night3) === 4 && rcfg.nights.map((x) => x.rivalBuffs).join() === '0,2,4', `第 1 晚 ${night1.topSpeedKmh} km/h 無 buff；第 3 晚帶 ${night3.buffList.map((it) => it.def.name + (it.count > 1 ? '×' + it.count : '')).join('・')}`);
+  }
+  check('彎道之王：過彎極限高於玩家', dy.car.latAccelMax > cfg.latAccelMax * 1.2 && yasha.cornerSkill === 1,
+    `橫向加速度 ${dy.car.latAccelMax.toFixed(1)} vs 玩家 ${cfg.latAccelMax} m/s²：半徑 100 m 的彎可用 ${(Math.sqrt(dy.car.latAccelMax * 0.98 * 100) * 3.6).toFixed(0)} km/h 過，玩家極限 ${(Math.sqrt(cfg.latAccelMax * 100) * 3.6).toFixed(0)} km/h`);
   check('終極對手：持續卡位', akatsuki.block === 1 && akatsuki.special === 'blocker');
-  check('極速怪物：直線極速最高', typhoon.topSpeedKmh > Math.max(...rivals.filter((r) => r.id !== 'typhoon').map((r) => r.topSpeedKmh)), `${typhoon.topSpeedKmh} km/h`);
+  {
+    const fixedTop = (r) => r.topSpeedKmh + (r.buffs || []).reduce((a, id) => a + (id === 'tall_gears' ? 6 : id === 'last_resort' ? 12 : 0), 0);
+    check('極速怪物：直線極速最高（原廠＋固定 buff）', fixedTop(typhoon) > Math.max(...rivals.filter((r) => r.id !== 'typhoon').map(fixedTop)), `${fixedTop(typhoon)} km/h`);
+  }
 }
 
 section('Boss 登場：玩家極速 330 km/h、車流最密的第三晚');

@@ -17,6 +17,8 @@ export function createDuel(cfg, events) {
     result: null,       // { win, reason }
     // 成長系統可修改的規則參數
     mods: { threshold: cfg.threshold, scoreMul: 1, keepOnOvertaken: 0 },
+    // 對手抽到的成長（不屈…）改的是這一份
+    rivalMods: { threshold: cfg.threshold, scoreMul: 1, keepOnOvertaken: 0 },
 
     /** 標示一位對手 */
     mark(tier = 'normal') {
@@ -69,7 +71,7 @@ export function createDuel(cfg, events) {
       // 超車判定：對方領先超過一個車身才算，避免並排時反覆歸零
       const m = cfg.overtakeMargin;
       if (d.gap > m && d.leader !== 1) {
-        if (d.leader === -1) { const lost = d.scoreR; d.scoreR = 0; emit('duelZero', { who: 'rival', lost }); }
+        if (d.leader === -1) { const lost = d.scoreR * (1 - d.rivalMods.keepOnOvertaken); d.scoreR -= lost; emit('duelZero', { who: 'rival', lost }); }
         d.leader = 1;
       } else if (d.gap < -m && d.leader !== -1) {
         if (d.leader === 1) {
@@ -86,7 +88,7 @@ export function createDuel(cfg, events) {
       if (d.leader !== 0 && abs > thr) {
         let rate = Math.min(cfg.rateCap, cfg.rateBase + cfg.ratePerMeter * (abs - thr));
         if (d.leader === 1) { rate *= d.mods.scoreMul; d.scoreP += rate * dt; }
-        else d.scoreR += rate * dt;
+        else { rate *= d.rivalMods.scoreMul; d.scoreR += rate * dt; }
         d.rate = rate; d.scoring = d.leader;
       }
 

@@ -61,13 +61,13 @@ section('範例成長：零件');
 {
   const base = session().playerCfg;
   const a = zeroTo100(base), b = zeroTo100(session(['turbo']).playerCfg);
-  check('渦輪增壓器：加速 +12%', near(session(['turbo']).playerCfg.power / base.power, 1.12, 1e-9) && b < a * 0.93, `0–100 km/h ${a.toFixed(2)} → ${b.toFixed(2)} 秒`);
+  check('渦輪增壓器：加速 +6%', near(session(['turbo']).playerCfg.power / base.power, 1.06, 1e-9) && b < a * 0.96, `0–100 km/h ${a.toFixed(2)} → ${b.toFixed(2)} 秒`);
   const t0 = topSpeed(base), t1 = topSpeed(session(['tall_gears']).playerCfg);
-  check('高速齒輪比：極速 +15 km/h', near(t1 - t0, 15, 0.6), `實測極速 ${t0.toFixed(1)} → ${t1.toFixed(1)} km/h`);
+  check('高速齒輪比：極速 +6 km/h', near(t1 - t0, 6, 0.6), `實測極速 ${t0.toFixed(1)} → ${t1.toFixed(1)} km/h`);
   const l0 = latAccel(base, 40), l1 = latAccel(session(['semi_slicks']).playerCfg, 40);
-  check('半熱熔胎：抓地 +15%', near(l1 / l0, 1.15, 0.01), `144 km/h 時橫向加速度 ${l0.toFixed(1)} → ${l1.toFixed(1)} m/s²`);
+  check('半熱熔胎：抓地 +7%', near(l1 / l0, 1.07, 0.01), `144 km/h 時橫向加速度 ${l0.toFixed(1)} → ${l1.toFixed(1)} m/s²`);
   const b0 = brakeTime(base), b1 = brakeTime(session(['big_calipers']).playerCfg);
-  check('強化煞車卡鉗：煞車力 +20%', near(session(['big_calipers']).playerCfg.brakeDecel / base.brakeDecel, 1.2, 1e-9) && b1 < b0 * 0.87, `100→0 km/h ${b0.toFixed(2)} → ${b1.toFixed(2)} 秒`);
+  check('強化煞車卡鉗：煞車力 +10%', near(session(['big_calipers']).playerCfg.brakeDecel / base.brakeDecel, 1.1, 1e-9) && b1 < b0 * 0.93, `100→0 km/h ${b0.toFixed(2)} → ${b1.toFixed(2)} 秒`);
 }
 
 section('範例成長：駕駛技能');
@@ -76,14 +76,14 @@ section('範例成長：駕駛技能');
   const slip = (ids) => {
     const S = session(ids);
     const c = S.traffic.cars[0];
-    Object.assign(c, { active: true, onAlt: false, lane: 1, toLane: 1, fromLane: 1, s: S.state.s + 40 + (c.len + 4.4) / 2, d: 0, v: 30, cruise: 30, timer: 99 });
+    Object.assign(c, { active: true, onAlt: false, lane: 1, toLane: 1, fromLane: 1, s: S.state.s + 36 + (c.len + 4.4) / 2, d: 0, v: 30, cruise: 30, timer: 99 });
     S.state.vf = 30;
     S.step(DT, { throttle: 1, brake: 0, steer: 0 });
     return { on: S.slip, drag: S.state.dragMul, range: S.playerCfg.slipstreamRange };
   };
   const s0 = slip([]), s1 = slip(['slipstream_master']);
-  check('吸尾流大師：距離 ×1.5、效果 +50%', !s0.on && s1.on && near(s1.range, 45, 1e-9) && near(1 - s1.drag, 0.525, 1e-9),
-    `前車在 40 m：無成長${s0.on ? '有' : '沒有'}尾流，有成長阻力 −${((1 - s1.drag) * 100).toFixed(1)}%（原本 −35%、30 m）`);
+  check('吸尾流大師：距離 ×1.3、效果 +30%', !s0.on && s1.on && near(s1.range, 39, 1e-9) && near(1 - s1.drag, 0.455, 1e-9),
+    `前車在 36 m：無成長${s0.on ? '有' : '沒有'}尾流，有成長阻力 −${((1 - s1.drag) * 100).toFixed(1)}%（原本 −35%、30 m）`);
 
   const w0 = wallLoss(session().playerCfg), w1 = wallLoss(session(['soft_scrape']).playerCfg);
   check('柔和擦撞：撞牆減速減半', w0 > 0 && near(w1 / w0, 0.5, 1e-6), `同一角度撞牆扣速 ${(w0 * 100).toFixed(1)}% → ${(w1 * 100).toFixed(1)}%`);
@@ -115,16 +115,27 @@ section('範例成長：駕駛技能');
   check('甩尾加速：太短的甩尾不觸發', tiny.boostT === 0);
 }
 
+section('不服輸：單向的橡皮筋');
+{
+  // 玩家：對決中落後才有極速加成，領先或沒有對決時沒有
+  const S = session(['comeback'], { mode: 'run' });
+  const place = (ahead) => { S.rival.active = true; S.rival.def = rivals[0]; S.rival.onAlt = false; S.rival.st.s = S.state.s + ahead; S.duel.phase = 'racing'; S.step(DT, { throttle: 1, brake: 0, steer: 0 }); return S.state.topMul; };
+  const behind = place(30), leading = place(-30);
+  S.duel.phase = 'idle'; S.step(DT, { throttle: 1, brake: 0, steer: 0 });
+  check('玩家：落後時極速 +5%，領先時沒有效果', near(behind, 1.05, 1e-9) && leading === 1 && S.state.topMul === 1 && session([], { mode: 'run' }).playerCfg.comebackTop === 0, `落後 ×${behind}、領先 ×${leading}、沒有對決 ×${S.state.topMul}`);
+  check('橡皮筋不再是預設規則', !('rubberBand' in dcfg));
+}
+
 section('範例成長：取捨');
 {
   const base = session().playerCfg, lr = session(['last_resort']).playerCfg;
   const t0 = topSpeed(base), t1 = topSpeed(lr), y0 = yawLow(base), y1 = yawLow(lr);
-  check('窮途末路：極速 +25 km/h，轉向力 −15%', near(t1 - t0, 25, 0.8) && near(y1 / y0, 0.85, 0.01),
+  check('窮途末路：極速 +12 km/h，轉向力 −10%', near(t1 - t0, 12, 0.8) && near(y1 / y0, 0.9, 0.01),
     `極速 ${t0.toFixed(1)} → ${t1.toFixed(1)} km/h；低速偏航 ${y0.toFixed(2)} → ${y1.toFixed(2)} rad/s`);
 
   const rate = (ids) => { const S = session(ids, { mode: 'run' }); const go = racing(S); go(40.001, 1); const r = S.duel.scoreP; const m0 = S.clock.minute; go(-10, 0.1); return { r, lost: S.clock.minute - m0 }; };
   const g0 = rate([]), g1 = rate(['gambler']);
-  check('賭徒：得分速度 +30%，被超車時扣 5 分鐘', near(g1.r / g0.r, 1.3, 1e-6) && near(g1.lost, 5, 1e-9) && g0.lost === 0,
+  check('賭徒：得分速度 +20%，被超車時扣 5 分鐘', near(g1.r / g0.r, 1.2, 1e-6) && near(g1.lost, 5, 1e-9) && g0.lost === 0,
     `剛過門檻每秒 ${g0.r.toFixed(1)} → ${g1.r.toFixed(1)} 分；被超車時鐘 +${g1.lost.toFixed(0)} 分鐘（無成長 +${g0.lost}）`);
 
   const thr = (ids) => { const S = session(ids); const go = racing(S); go(30, 1); return S.duel.scoreP; };
@@ -141,13 +152,13 @@ section('效果系統');
   const S = session();
   const U = S.upgrades;
   const base = { ...S.playerCfg };
-  U.add('turbo'); U.add('turbo'); U.add('turbo');
-  check('可疊加的成長：三層相乘', near(S.playerCfg.power / base.power, 1.12 ** 3, 1e-9) && U.count('turbo') === 3, `加速 ×${(S.playerCfg.power / base.power).toFixed(3)}`);
-  check('超過疊加上限會被拒絕', U.add('turbo') === false && U.count('turbo') === 3);
+  for (let k = 0; k < 5; k++) U.add('turbo');
+  check('可疊加的成長：五層相乘', near(S.playerCfg.power / base.power, 1.06 ** 5, 1e-9) && U.count('turbo') === 5, `加速 ×${(S.playerCfg.power / base.power).toFixed(3)}`);
+  check('超過疊加上限會被拒絕', U.add('turbo') === false && U.count('turbo') === 5);
   U.add('unyielding');
   check('不可疊加的成長不能拿第二次', U.add('unyielding') === false);
   U.add('tall_gears'); U.add('last_resort');
-  check('add 與 mul 混用：先加後乘', near(S.playerCfg.vMaxKmh, base.vMaxKmh + 15 + 25, 1e-9));
+  check('add 與 mul 混用：先加後乘', near(S.playerCfg.vMaxKmh, base.vMaxKmh + 6 + 12, 1e-9));
   for (const it of U.list()) for (let i = 0; i < it.count; i++) U.remove(it.def.id);
   check('移除後完全回到基準值', U.total === 0 && Object.keys(base).every((k) => S.playerCfg[k] === base[k]) && S.duel.mods.keepOnOvertaken === 0);
 
