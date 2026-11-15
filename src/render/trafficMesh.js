@@ -21,10 +21,12 @@ function glowTexture() {
 
 const PALETTE = [0xb8bcc2, 0xe8e8e6, 0x23262b, 0x5a6470, 0x7a1f1f, 0x1f3a6a, 0x8a7a5a, 0x3a4a3a];
 
-export function createTrafficMesh(scene, road, traffic, cfg, models) {
+/** opts.reverse：這批車是對向車流（車頭朝後、亮的是頭燈）；opts.maxCars：物件池大小 */
+export function createTrafficMesh(scene, road, traffic, cfg, models, opts = {}) {
+  const reverse = !!opts.reverse;
   const group = new THREE.Group();
   scene.add(group);
-  const N = cfg.maxCars;
+  const N = opts.maxCars ?? cfg.maxCars;
   // 車身由 carBuilder 生成（輪子併進幾何）；頂點色乘上每台車的顏色，玻璃與輪胎維持深色
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, flatShading: true, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide });
   const bodies = {};
@@ -55,7 +57,7 @@ export function createTrafficMesh(scene, road, traffic, cfg, models) {
   const haloGeo = new THREE.BufferGeometry();
   haloGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3).setUsage(THREE.DynamicDrawUsage));
   const halos = new THREE.Points(haloGeo, new THREE.PointsMaterial({
-    map: glowTexture(), color: 0xff2a18, size: 3.2, sizeAttenuation: true, transparent: true,
+    map: glowTexture(), color: reverse ? 0xfff0d0 : 0xff2a18, size: reverse ? 4.2 : 3.2, sizeAttenuation: true, transparent: true,
     blending: THREE.AdditiveBlending, depthWrite: false,
   }));
   halos.frustumCulled = false;
@@ -90,8 +92,8 @@ export function createTrafficMesh(scene, road, traffic, cfg, models) {
       const hp = haloGeo.attributes.position;
       for (const c of traffic.cars) {
         const i = c.id;
-        for (const type in bodies) if (type !== c.type || !c.active) bodies[type].setMatrixAt(i, ZERO);
-        if (!c.active) {
+        for (const type in bodies) if (type !== c.type || !c.active || c.hidden) bodies[type].setMatrixAt(i, ZERO);
+        if (!c.active || c.hidden) {
           for (let k = 0; k < 2; k++) { tails.setMatrixAt(i * 2 + k, ZERO); heads.setMatrixAt(i * 2 + k, ZERO); }
           blinks.setMatrixAt(i * 2, ZERO); blinks.setMatrixAt(i * 2 + 1, ZERO);
           hp.setXYZ(i, 0, -9999, 0);
@@ -105,8 +107,10 @@ export function createTrafficMesh(scene, road, traffic, cfg, models) {
         const cs = Math.cos(c.yaw), sn = Math.sin(c.yaw);
         F.copy(T).multiplyScalar(cs).addScaledVector(R, -sn);
         L.copy(R).multiplyScalar(-cs).addScaledVector(T, -sn);
+        if (reverse) { F.negate(); L.negate(); }
         base.makeBasis(L, U, F);
-        base.setPosition(fr.p[0] + R.x * cD - anchor.x, fr.p[1] + R.y * cD - anchor.y, fr.p[2] + R.z * cD - anchor.z);
+        const cH = c.h || 0;
+        base.setPosition(fr.p[0] + R.x * cD + U.x * cH - anchor.x, fr.p[1] + R.y * cD + U.y * cH - anchor.y, fr.p[2] + R.z * cD + U.z * cH - anchor.z);
 
         const body = bodies[c.type];
         body.setMatrixAt(i, base);
@@ -148,7 +152,9 @@ export function createTrafficMesh(scene, road, traffic, cfg, models) {
             trails.feed(i * 2 + k, e[12] + anchor.x + L.x * sx + U.x * ly - F.x * c.len / 2, e[13] + anchor.y + L.y * sx + U.y * ly - F.y * c.len / 2, e[14] + anchor.z + L.z * sx + U.z * ly - F.z * c.len / 2, hx, hy, hz, a);
           }
         }
-        hp.setXYZ(i, e[12] + U.x * ly - F.x * c.len / 2, e[13] + U.y * ly - F.y * c.len / 2, e[14] + U.z * ly - F.z * c.len / 2);
+        // 光暈：一般車流在車尾（紅），對向車流在車頭（白）
+        const gy = reverse ? hy : ly, gz = (reverse ? 0.5 : -0.5) * c.len;
+        hp.setXYZ(i, e[12] + U.x * gy + F.x * gz, e[13] + U.y * gy + F.y * gz, e[14] + U.z * gy + F.z * gz);
       }
       for (const type in bodies) {
         bodies[type].instanceMatrix.needsUpdate = true;

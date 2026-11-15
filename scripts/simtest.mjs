@@ -564,5 +564,73 @@ section('性能數字對照規格');
   check('100→0 km/h 約 3 秒', Math.abs(tb - 3) < 0.5, `${tb.toFixed(2)} 秒`);
 }
 
+section('對向車道、對向車流、逆向警告');
+{
+  const { OPP, oppNode, oppAt } = await import('../src/road/opposite.js');
+  const ev = createEvents();
+  const got = [];
+  ev.on('wrongWay', (e) => got.push(e.on));
+  const S = createSession({ seed: 31337, carCfg: cfg, zone, trafficCfg: tcfg, duelCfg: dcfg, rivals: allRivals, events: ev, runCfg: rcfg });
+  const { state: st, road, oncoming } = S;
+  const inp = {}, mem = createAiMemory();
+  let inside = 0, wrongDir = 0, seen = 0, maxN = 0, hiddenAtJct = 0, shownAtJct = 0, tunnelOrJct = 0, rampBad = 0, falseWarn = 0;
+  const prevS = new Map(), stale = new Map();
+  for (let i = 0; i < 8 * 60 * 60 && !S.over; i++) {
+    autopilot(st, cfg, road, { traffic: S.obsForPlayer, mem, dt: DT }, inp);
+    S.step(DT, inp);
+    { const m = S.menus?.current; if (m && m.lock <= 0) S.menus.input('left'); }
+    if (S.wrongWay) falseWarn++;
+    let n = 0;
+    for (const c of oncoming.cars) {
+      if (!c.active) { prevS.delete(c.id); continue; }
+      n++;
+      const p = prevS.get(c.id);
+      if (p !== undefined && c.s > p + 1e-9 && Math.abs(c.s - p) < 5) wrongDir++;
+      prevS.set(c.id, c.s);
+      const z = road.zoneAt(c.s) !== 0 || road.nodeTunnel(Math.floor(c.s / DS)) === 1;
+      // 道路在這一步被改寫（插入交流道、換分支）時，車的位置下一步才跟上：連續兩步都不對才算
+      let badNow = false;
+      if (z) { tunnelOrJct++; if (c.hidden) hiddenAtJct++; else badNow = true; }
+      if (c.hidden) { stale.delete(c.id); continue; }
+      seen++;
+      // 和主線平行的路段：車一定在主線右護欄外面；下沉的路段：至少低於橋面底
+      const o = oppAt(road, c.s);
+      if (o && (o.t < 0.5 ? c.d - c.wid / 2 < road.widthRight(c.s) + 0.3 : c.h > -3)) badNow = true;
+      const k = badNow ? (stale.get(c.id) || 0) + 1 : 0;
+      stale.set(c.id, k);
+      if (k === 2) { if (z) shownAtJct++; else inside++; }
+    }
+    if (n > maxN) maxN = n;
+    // 對向車道的高度：相鄰兩個 node 不能有落差（升降要平順）
+    if (i % 600 === 0) {
+      const i0 = Math.floor(st.s / DS);
+      for (let k = i0; k < i0 + 600 && k < road.iMax - 70; k++) {
+        const a = oppNode(road, k, {}), b = a && oppNode(road, k + 1, {});
+        if (b && Math.abs(a.h - b.h) > 0.6) rampBad++;
+      }
+    }
+  }
+  check('對向車流有在跑，而且都往回開', seen > 1000 && wrongDir === 0 && maxN >= 6, `同時最多 ${maxN} 台，方向錯 ${wrongDir} 次`);
+  check('對向車不會出現在主線上', inside === 0, `${inside} 次`);
+  check('交流道與隧道旁邊沒有對向車', tunnelOrJct > 0 && shownAtJct === 0, `經過 ${tunnelOrJct} 次，露出 ${shownAtJct} 次`);
+  check('對向車道升降平順', rampBad === 0, `${rampBad} 處落差`);
+  check('正常行駛不會跳逆向警告', falseWarn === 0 && got.length === 0, `${falseWarn} 步`);
+
+  // 掉頭往回開：半秒後警告；轉回來就解除；倒車不算
+  const T = createSession({ seed: 5, carCfg: cfg, zone, trafficCfg: { ...tcfg, densityPerKm: 0 }, duelCfg: dcfg, rivals, events: ev, mode: 'free' });
+  const t = T.state;
+  got.length = 0;
+  t.s = 600; t.psi = Math.PI; t.vf = 20; t.d = 0;
+  let at = -1;
+  for (let i = 0; i < 120; i++) { T.step(DT, { throttle: 0.5, steer: 0 }); if (T.wrongWay && at < 0) at = i * DT; }
+  check('逆向行駛半秒後跳警告', at > 0.4 && at < 0.8 && got[0] === true, `${at.toFixed(2)} 秒`);
+  t.psi = 0; t.vf = 20;
+  T.step(DT, { throttle: 1 });
+  check('轉回順向就解除', !T.wrongWay && got[got.length - 1] === false);
+  t.vf = 0; got.length = 0;
+  for (let i = 0; i < 240; i++) T.step(DT, { brake: 1 });
+  check('倒車不算逆向', t.vf < -2 && !T.wrongWay && got.length === 0, `${(t.vf * 3.6).toFixed(0)} km/h`);
+}
+
 console.log(failed ? `\n${failed} 項失敗` : '\n全部通過');
 process.exit(failed ? 1 : 0);

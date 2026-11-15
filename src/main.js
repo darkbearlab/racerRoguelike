@@ -75,14 +75,15 @@ const post = createPost(renderer);
 // 畫質：high = HDR 後處理全開；low = 直接畫到螢幕。網址加 ?gfx=low 可強制低畫質
 const gfx = { quality: params.get('gfx') === 'low' ? 'low' : 'high', wet: params.get('wet') !== '0', blur: params.get('blur') !== '0' };
 const streamer = createStreamer(scene, road, renderer, seed);
-let trafficMesh = null, car = null, rivalCar = null, nightEnv = null;
+let wrongBeepT = 0;
+let trafficMesh = null, oncomingMesh = null, car = null, rivalCar = null, nightEnv = null;
 const reflection = createReflection(renderer, streamer.roadMaterial);
 const trails = createTrails(scene, trafficCfg.maxCars * 2 + 8);
 const TRAIL_PLAYER = trafficCfg.maxCars * 2, TRAIL_RIVAL = TRAIL_PLAYER + 2;
 const applyGfx = () => {
   const hi = gfx.quality !== 'low';
   post.enabled = hi;
-  streamer.setHdr(post.active); setMood(post.active); trafficMesh?.setHdr(post.active);
+  streamer.setHdr(post.active); setMood(post.active); trafficMesh?.setHdr(post.active); oncomingMesh?.setHdr(post.active);
   car?.setHdr(post.active); rivalCar?.setHdr(post.active);
   if (typeof packCars !== 'undefined') for (const m of packCars) m.setHdr(post.active);
   trails.enabled = hi; trails.setHdr(post.active);
@@ -91,7 +92,7 @@ const applyGfx = () => {
   // 車漆倒影：第一次開高畫質時才生成環境貼圖
   if (hi && !nightEnv) nightEnv = createNightEnv(renderer);
   const env = hi ? nightEnv : null;
-  for (const o of [car, rivalCar, trafficMesh]) if (o && o.glossEnv !== env) { o.glossEnv = env; o.setGloss(env); }
+  for (const o of [car, rivalCar, trafficMesh, oncomingMesh]) if (o && o.glossEnv !== env) { o.glossEnv = env; o.setGloss(env); }
 };
 /** 一台車的兩顆尾燈各留一條光軌 */
 const v3t = new THREE.Vector3();
@@ -146,6 +147,8 @@ const packCars = session.pack.map(() => {
 scene.add(rivalCar.group);
 trafficMesh = createTrafficMesh(scene, road, traffic, trafficCfg, modelsJson);
 trafficMesh.setTrails(trails);
+// 對向車流：同一套畫法，車頭朝這邊、亮的是頭燈
+oncomingMesh = createTrafficMesh(scene, road, session.oncoming, trafficCfg, modelsJson, { reverse: true, maxCars: session.oncoming.maxCars });
 applyGfx();
 const sparks = createSparks(scene);
 const rig = createCameraRig(camCfg);
@@ -615,6 +618,11 @@ function render(alpha, dt) {
 
   streamer.update(state.s, rig.camera);
   trafficMesh.update(pose.p, paused ? 0 : dt, a);
+  oncomingMesh.update(pose.p, paused ? 0 : dt, a);
+  // 逆向警告：字卡加警示音（每 0.9 秒響一次）
+  const ww = started && session.wrongWay && !session.over;
+  hud.wrongWay(ww);
+  if (ww && !paused) { wrongBeepT -= dt; if (wrongBeepT <= 0) { wrongBeepT = 0.9; audio.alarm(); } } else wrongBeepT = 0;
   trails.update(pose.p, paused ? 0 : dt);
 
   // 駕駛艙：儀表與後視鏡

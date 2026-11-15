@@ -13,6 +13,7 @@ import { createGenerator } from '../road/generator.js';
 import { JCT } from '../road/junction.js';
 import { createCarState, stepCar } from '../vehicle/physics.js';
 import { createTraffic } from '../vehicle/traffic.js';
+import { createOncoming } from '../vehicle/oncoming.js';
 import { collidePlayerTraffic, collidePair } from '../vehicle/collide.js';
 import { createRival, spawnRival as placeRival, updateRival } from '../vehicle/rival.js';
 import { createDuel } from './duel.js';
@@ -38,6 +39,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   const generator = createGenerator(road, createRng(seed), nights ? zoneOf(1) : zone);
   generator.fill(ROAD_AHEAD);
   const traffic = createTraffic(road, createRng(seed ^ 0x7f4a7c15), trafficCfg);
+  const oncoming = createOncoming(road, createRng(seed ^ 0x6a09e667), trafficCfg);   // 對向車流：只是景物
   const rivalRng = createRng(seed ^ 0x2545f491);
   const flowRng = createRng(seed ^ 0x51ed270b);
   const menuRng = createRng(seed ^ 0x3c6ef372);
@@ -101,6 +103,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   };
   const onlyPlayer = [playerProxy];
   traffic.populate(playerProxy);
+  oncoming.populate(playerProxy);
 
   const flow = {
     phase: 'cruise',     // cruise 巡航中、approach 交流道已出現、node 節點進行中
@@ -119,7 +122,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   const tierCount = {};
 
   const S = {
-    road, generator, traffic, state, rival, pack, packEdge, duel, clock, carCfg, playerCfg, upgrades, world, flow, mode,
+    road, generator, traffic, oncoming, wrongWay: false, wrongT: 0, state, rival, pack, packEdge, duel, clock, carCfg, playerCfg, upgrades, world, flow, mode,
     menus: null,         // 三選一與 PA 商店
     boostT: 0,           // 短暫加速的剩餘秒數（甩尾加速）
     lastHook: '',        // 最近觸發的成長（除錯用）
@@ -233,6 +236,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       const prev = S.prev;
       prev.s = state.s; prev.d = state.d; prev.psi = state.psi;
       traffic.snapshot();
+      oncoming.snapshot();
 
       // ── 三選一開著：世界完全停住，沒有時間限制，選完才繼續
       if (S.menus && S.menus.current && S.menus.current.kind === 'choice') {
@@ -336,6 +340,14 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       if (rival.active) racers.push(rival.proxy);
       for (const x of pack) if (x.active) racers.push(x.proxy);
       traffic.update(dt, playerProxy, rival.active ? racers : onlyPlayer);
+      oncoming.density = traffic.density;
+      oncoming.update(dt, playerProxy);
+      // 逆向：車頭朝後（倒車時車頭還是朝前，不算；甩尾轉過頭的一瞬間也不算），持續半秒才警告。
+      // 停著也算：往回開到道路盡頭會被擋住，這時更需要提示掉頭
+      const back = Math.cos(state.psi) < -0.3 && state.vf > -0.5;
+      S.wrongT = back ? S.wrongT + dt : 0;
+      const ww = S.wrongT > 0.5;
+      if (ww !== S.wrongWay) { S.wrongWay = ww; emit('wrongWay', { on: ww }); }
       // 對手前方一段距離不留車流：對手一出現就開始，車是在遠處被收掉的，玩家靠近時那一段已經是空的。
       // 倒數與剛開賽的幾秒也維持淨空，不會還沒開打就撞上
       if (S.clearT > 0) S.clearT -= dt;

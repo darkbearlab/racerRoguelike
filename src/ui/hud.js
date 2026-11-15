@@ -186,6 +186,8 @@ export function createHud(debugOn) {
       toast.style.opacity = 1;
       toastTimer = sec;
     },
+    /** 逆向警告 */
+    wrongWay(on) { set('wrong', $('wrong'), 'display', on ? 'block' : 'none'); },
     setPaused(p) { pause.style.display = p ? 'flex' : 'none'; },
     debug(text) { if (debugOn) debug.textContent = text; },
   };

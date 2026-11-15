@@ -17,6 +17,11 @@
   #drift { margin-top: 8px; font-size: 14px; letter-spacing: 3px; color: #ffb347; opacity: 0; transition: opacity .15s; }
   #toast { position: absolute; top: calc(18% + var(--mh, 0px)); left: 50%; transform: translateX(-50%); font-size: 22px; letter-spacing: 4px;
            padding: 6px 18px; background: rgba(5,8,15,.55); border-radius: 4px; opacity: 0; transition: opacity .25s; }
+  #wrong { position: absolute; top: calc(27% + var(--mh, 0px)); left: 50%; transform: translateX(-50%); display: none; text-align: center; white-space: nowrap;
+           padding: 10px 30px 8px; background: rgba(150,8,8,.82); border: 3px solid #ffe14a; border-radius: 6px; color: #fff;
+           font-size: 40px; font-weight: 800; letter-spacing: 10px; text-shadow: 0 2px 8px #000; animation: wrongBlink .7s steps(1) infinite; }
+  #wrong small { display: block; font-size: 15px; font-weight: 600; letter-spacing: 6px; color: #ffe14a; margin-top: 2px; }
+  @keyframes wrongBlink { 0% { opacity: 1; } 60% { opacity: .35; } }
   #help { position: absolute; left: 24px; bottom: 24px; font-size: 13px; line-height: 1.7; opacity: .75; text-shadow: 0 1px 4px #000; transition: opacity 1s; }
   #help b { display: inline-block; min-width: 86px; font-weight: 600; color: #9fd0ff; }
   #debug { position: absolute; left: 12px; top: 150px; margin: 0; padding: 8px 10px; font: 12px/1.5 Consolas, monospace;
@@ -261,6 +266,7 @@
   </div>
   <div id="over"><h1 id="overTitle">天亮了</h1><p id="overSub"></p><table id="overTable"></table><small>按 R 重新開始</small></div>
   <div id="toast"></div>
+  <div id="wrong">⚠ 逆向行駛<small>WRONG WAY　請掉頭</small></div>
   <div id="help">
     <div><b>W / ↑</b>油門</div>
     <div><b>S / ↓</b>煞車／倒車</div>

@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DS, makeFrame } from './spline.js';
 import { JCT } from './junction.js';
 import { createRng } from '../core/rng.js';
+import { OPP, oppNode } from './opposite.js';
 
 // 道路網格串流：每 200 m 一個 chunk，固定數量的 slot 重複使用（物件池）。
 // 緩衝區與 InstancedMesh 全部預先配置好，重建 chunk 只是覆寫數值，不配置新物件。
@@ -133,6 +134,17 @@ function windowTexture(rng) {
 
 // ── 路邊的「似是而非」：假出口／入口、隔音牆、上層高架 ─────────────
 // 全部由 node 編號的雜湊決定，同一段路每次都長一樣；只是裝飾，不影響碰撞與玩法。
+// 對向車道：同一次建 chunk 會問很多次同一個 node，先記起來（道路會被改寫，所以每次建之前清掉）
+const _oppMemo = new Map();
+let _oppRd = null;
+function oppM(rd, i) {
+  if (rd !== _oppRd) { _oppMemo.clear(); _oppRd = rd; }
+  let o = _oppMemo.get(i);
+  if (o === undefined) { o = oppNode(rd, i, { t: 0, off: 0, h: 0 }); _oppMemo.set(i, o); }
+  return o;
+}
+const oppFlat = (rd, i) => { const o = oppM(rd, i); return !!o && o.t === 0; };
+
 const hash01 = (n) => { let x = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); x ^= x >>> 16; return (x >>> 0) / 4294967296; };
 const XBLK = 450, XLEN = 70;      // 每 900 m 一格，格內最多一個假出口，長 140 m
 const _exit = { t: 0, sd: 1, k: 0, rev: false };
@@ -143,7 +155,7 @@ export function exitAt(rd, i) {
   const a = b * XBLK + 40 + Math.floor(hash01(b * 31 + 5) * (XBLK - XLEN - 80));
   const k = i - a;
   if (k < 0 || k > XLEN) return null;
-  const sd = hash01(b * 131 + 3) < 0.6 ? -1 : 1;   // 靠左行駛：出口多半在左側
+  const sd = -1;   // 靠左行駛：出口都在左側（右側是對向車道）
   if (rd.nodeZone(i) !== 0 || rd.nodeTunnel(i) === 1) return null;
   if ((sd < 0 ? rd.nodeWl(i) : rd.nodeWr(i)) > rd.halfWidth + 0.02) return null;
   _exit.rev = hash01(b * 17 + 9) < 0.35;
@@ -185,6 +197,22 @@ function stripDefs(hw) {
   });
   const z = (...list) => (rd, i) => list.includes(rd.nodeZone(i));
 
+  // 上層高架：右側有對向車道時連它一起蓋住
+  const OW = hw * 2, OSPAN = OPP.gap + OW;
+  const upEdge = (sd) => (f) => (sd < 0 ? -(f.wl + 1.2) : f.wr + 1.2 + (oppFlat(f.rd, f.i) ? OSPAN : 0));
+  // 對向車道的帶狀面：位置以它靠主線那一側的路緣為準。flat = 只在和主線平行的路段畫
+  const os = (o0, h0, o1, h1, uv, flat, extra) => ({
+    uv,
+    ok: (rd, i) => { const o = oppM(rd, i); return !!o && (!flat || o.t === 0) && (!extra || extra(rd, i)); },
+    ends(f, e) {
+      const o = oppM(f.rd, f.i);
+      if (!o || (flat && o.t > 0)) return false;
+      const A = f.wr + o.off;
+      e.da = A + o0; e.ha = o.h + h0; e.db = A + o1; e.hb = o.h + h1;
+      return true;
+    },
+  });
+
   const defs = { road: [], concrete: [], dark: [], deck: [], tunnelWall: [], tunnelLight: [], tunnelFloor: [], paint: [], paintY: [], lightWall: [] };
   defs.road.push(seg(-hw, 0, hw, 0, normal, 'road'));
   defs.road.push(seg(edge(-1, 0), 0, -hw, 0, (rd, i) => normal(rd, i) && (rd.nodeWl(i) > hw + 0.02 || rd.nodeWl(i + 1) > hw + 0.02), 'plain'));
@@ -193,7 +221,7 @@ function stripDefs(hw) {
     const wall = (rd, i) => open(rd, i) && !exitOpen(rd, i, sd);
     defs.concrete.push(seg(edge(sd, 0), 0, edge(sd, 0), 1.0, wall));
     defs.concrete.push(seg(edge(sd, 0), 1.0, edge(sd, 0.3), 1.0, wall));
-    defs.dark.push(seg(edge(sd, 0.3), 1.0, edge(sd, 0.3), 3.4, (rd, i) => wall(rd, i) && normal(rd, i) && (Math.abs(rd.nodeKappa(i)) > 0.0015 || noiseAt(i, sd)) && !exitAt(rd, i)));
+    defs.dark.push(seg(edge(sd, 0.3), 1.0, edge(sd, 0.3), 3.4, (rd, i) => wall(rd, i) && normal(rd, i) && (Math.abs(rd.nodeKappa(i)) > 0.0015 || noiseAt(i, sd)) && !exitAt(rd, i) && !(sd > 0 && oppM(rd, i))));
     // 假出口：護欄開口處的發光柵欄、往外彎下去的匝道（路面＋兩側護欄）
     defs.lightWall.push(seg(edge(sd, 0), 0.15, edge(sd, 0), 1.15, (rd, i) => exitOpen(rd, i, sd)));
     defs.paintY.push(line(edge(sd, -0.45), (rd, i) => exitOpen(rd, i, sd)));
@@ -214,7 +242,7 @@ function stripDefs(hw) {
     defs.concrete.push({ ...ramp(0, 0, 0, 1.0), ok: (rd, i) => onRamp(rd, i) && !exitOpen(rd, i, sd) && exitAt(rd, i).t >= 0.36 });
     defs.deck.push(ramp(0, -1.2, 5.2, -1.2));
     // 上層高架的側面
-    defs.deck.push(seg(edge(sd, 1.2), UPPER_H, edge(sd, 1.2), UPPER_H + 1.7, upperAt));
+    defs.deck.push(seg(upEdge(sd), UPPER_H, upEdge(sd), UPPER_H + 1.7, upperAt));
     defs.deck.push(seg(edge(sd, 0.3), 1.0, edge(sd, 0.3), -1.6, open));
     defs.deck.push(seg(edge(sd, 0.6), -1.6, edge(sd, 0.6), TH + 0.8, tunnel));
     defs.tunnelWall.push(seg(edge(sd, 0), 0, edge(sd, 0), TH, tunnel));
@@ -223,10 +251,17 @@ function stripDefs(hw) {
     defs.paint.push(line(edge(sd, -0.75), zoned));
   }
   defs.deck.push(seg(edge(-1, 0.3), -1.6, edge(1, 0.3), -1.6, open));
-  defs.deck.push(seg(edge(-1, 1.2), UPPER_H, edge(1, 1.2), UPPER_H, upperAt));   // 上層高架的底面
+  defs.deck.push(seg(upEdge(-1), UPPER_H, upEdge(1), UPPER_H, upperAt));   // 上層高架的底面
   defs.deck.push(seg(edge(-1, 0.6), TH + 0.8, edge(1, 0.6), TH + 0.8, tunnel));
   defs.tunnelWall.push(seg(edge(-1, 0), TH, edge(1, 0), TH, tunnel));
   defs.tunnelFloor.push(seg(edge(-1, 0), 0.05, edge(1, 0), 0.05, tunnel));
+
+  // ── 對向車道：路面、兩側護欄、中央分隔帶的頂面、橋面底與側面、外側的隔音牆
+  defs.road.push(os(0, 0, OW, 0, 'road'));
+  defs.concrete.push(os(0, 0, 0, 1.0), os(-0.3, 1.0, 0, 1.0), os(OW, 0, OW, 1.0), os(OW, 1.0, OW + 0.3, 1.0));
+  defs.concrete.push(os(0.3 - OPP.gap, 1.0, -0.3, 1.0, undefined, true));
+  defs.deck.push(os(-0.3, -1.6, OW + 0.3, -1.6), os(OW + 0.3, 1.0, OW + 0.3, -1.6), os(-0.3, 1.0, -0.3, -1.6));
+  defs.dark.push(os(OW + 0.3, 1.0, OW + 0.3, 3.4, undefined, true, (rd, i) => Math.abs(rd.nodeKappa(i)) > 0.0015 || noiseAt(i, 1)));
 
   // 交流道的車道線。分歧前：左兩車道的分隔線、右兩車道的分隔線、以及把左右分開的中線（最後 200 m 變黃）
   defs.paint.push(line((f) => (f.l0 + f.l1) / 2, z(1, 2, 3), true));
@@ -446,12 +481,12 @@ export function createStreamer(scene, road, renderer, seed) {
     };
     const slot = {
       chunk: -1, src: 'main', dirty: false, group, cats,
-      poles: inst(poleGeo, poleMat, NLAMP, 170),
-      heads: inst(headGeo, headMat, NLAMP, 170),
-      glows: inst(glowGeo, glowMat, NLAMP, 170),
+      poles: inst(poleGeo, poleMat, NLAMP * 2, 170),   // 後半是對向車道的路燈
+      heads: inst(headGeo, headMat, NLAMP * 2, 170),
+      glows: inst(glowGeo, glowMat, NLAMP * 2, 170),
       pillars: inst(pillarGeo, mats.deck, NPILLAR, 180),
       builds: inst(buildGeo, buildMat, NBUILD, 520),
-      halos: points(haloMat, NLAMP),
+      halos: points(haloMat, NLAMP * 2),
       refl: points(reflMat, NREFL),
       boxes: inst(unitBox, propMat, NBOX, 260),
       glowBoxes: inst(unitBox, propGlowMat, NGLOW, 260),
@@ -476,6 +511,7 @@ export function createStreamer(scene, road, renderer, seed) {
   function build(slot, c, src) {
     const t0 = performance.now();
     const rd = src === 'alt' ? alt : road;
+    _oppMemo.clear(); _oppRd = rd;
     const fork = rd.fork;
     // alt 只畫分歧點之後；分歧點之前那段主線已經畫了
     const iFrom = src === 'alt' ? fork.i : -Infinity;
@@ -567,6 +603,23 @@ export function createStreamer(scene, road, renderer, seed) {
       const hd = d - side * 2.9;
       halo.setXYZ(n, fr.p[0] + fr.r[0] * hd + fr.u[0] * 9.6 - ox, fr.p[1] + fr.r[1] * hd + fr.u[1] * 9.6 - oy, fr.p[2] + fr.r[2] * hd + fr.u[2] * 9.6 - oz);
     }
+    // 對向車道的路燈：立在它的外側，每 40 m 一盞
+    for (let n = 0; n < NLAMP; n++) {
+      const i = i0 + n * LAMP_EVERY + LAMP_EVERY / 2, o = i >= iFrom ? oppM(rd, i) : null, at = NLAMP + n;
+      if (!o) {
+        for (const m of [slot.poles, slot.heads, slot.glows]) m.setMatrixAt(at, ZERO);
+        halo.setXYZ(at, 0, -9999, 0);
+        continue;
+      }
+      rd.frameNode(i, fr, false);
+      const d = fr.wr + o.off + hw * 2 + 0.7;
+      vX.set(-fr.r[0], -fr.r[1], -fr.r[2]); vY.fromArray(fr.u); vZ.fromArray(fr.t);
+      m4.makeBasis(vX, vY, vZ);
+      m4.setPosition(fr.p[0] + fr.r[0] * d + fr.u[0] * o.h - ox, fr.p[1] + fr.r[1] * d + fr.u[1] * o.h - oy, fr.p[2] + fr.r[2] * d + fr.u[2] * o.h - oz);
+      for (const m of [slot.poles, slot.heads, slot.glows]) m.setMatrixAt(at, m4);
+      const hd = d - 2.9, hh = 9.6 + o.h;
+      halo.setXYZ(at, fr.p[0] + fr.r[0] * hd + fr.u[0] * hh - ox, fr.p[1] + fr.r[1] * hd + fr.u[1] * hh - oy, fr.p[2] + fr.r[2] * hd + fr.u[2] * hh - oz);
+    }
     halo.needsUpdate = true;
     for (const m of [slot.poles, slot.heads, slot.glows]) m.instanceMatrix.needsUpdate = true;
 
@@ -623,7 +676,11 @@ export function createStreamer(scene, road, renderer, seed) {
         glow(i, rd.nodeWr(i) + 0.2, 1.9, 0.16, 0.3, 4.5, 1.2);
       }
       // 上層高架的支柱：每 40 m 一對
-      if (i % 20 === 0 && upperAt(rd, i) && plainAt(i)) for (const sd of [-1, 1]) box(i, sd * ((sd < 0 ? rd.nodeWl(i) : rd.nodeWr(i)) + 1.8), -1.6, 1.3, UPPER_H + 1.6, 1.3, 0, 0.2, 0.21, 0.23);
+      if (i % 20 === 0 && upperAt(rd, i) && plainAt(i)) for (const sd of [-1, 1]) {
+        const o = sd > 0 ? oppM(rd, i) : null;
+        if (o && o.t > 0) continue;   // 對向車道正在升降：柱子會插在它的路面上
+        box(i, sd * ((sd < 0 ? rd.nodeWl(i) : rd.nodeWr(i)) + 1.8) + (o ? OPP.gap + hw * 2 : 0), -1.6, 1.3, UPPER_H + 1.6, 1.3, 0, 0.2, 0.21, 0.23);
+      }
       // 假出口：開口上方一排警示燈，起點立一面「出口封閉」的牌子
       const ex = exitAt(rd, i);
       if (ex) {
@@ -636,7 +693,9 @@ export function createStreamer(scene, road, renderer, seed) {
       }
     }
     if (plainAt(iMid) && plainAt(iMid - 30) && plainAt(iMid + 30) && !nearFork && !upperAt(rd, iMid)) {
-      const wl = rd.nodeWl(iMid), wr = rd.nodeWr(iMid), mid = (wr - wl) / 2;
+      const wl = rd.nodeWl(iMid), wr0 = rd.nodeWr(iMid);
+      // 右側有對向車道：跨過去的結構（橋墩、橋塔）連它一起跨
+      const wr = wr0 + (oppM(rd, iMid) ? OPP.gap + hw * 2 + 0.3 : 0), mid = (wr - wl) / 2;
       if (hc < 0.3) {
         // 跨線橋：另一條高架從頭頂斜斜跨過去
         const yaw = Math.PI / 2 + (hash01(c * 311 + 1) - 0.5) * 0.9, h = 14 + hash01(c * 71 + 2) * 5;
@@ -656,7 +715,7 @@ export function createStreamer(scene, road, renderer, seed) {
         box(iMid, mid, 48, wl + wr + 10, 3.0, 3.2, 0, 0.4, 0.42, 0.46);
       } else if (hc > 0.5 && hc < 0.82) {
         // 門架指示牌
-        const half = Math.max(wl, wr) + 1.0, kind = Math.floor(hash01(c * 53 + 7) * 3);
+        const half = Math.max(wl, wr0) + 1.0, kind = Math.floor(hash01(c * 53 + 7) * 3);
         for (const sd of [-1, 1]) box(iMid, sd * half, 0, 0.4, 9, 0.4, 0, 0.3, 0.32, 0.35);
         box(iMid, 0, 8.6, half * 2 + 0.4, 0.5, 0.5, 0, 0.3, 0.32, 0.35);
         sign(kind, iMid, -3.7, 5.3, 6.6, 3.2);
@@ -849,7 +908,7 @@ export function createStreamer(scene, road, renderer, seed) {
           if (src === 'alt' && (!alt || c < cFork || c > cAltMax)) continue;
           if (find(c, src)) continue;
           const rd = src === 'alt' ? alt : road;
-          if ((c + 1) * CH + 2 > rd.iMax || c * CH < rd.iMin) continue; // 道路資料還沒生成到這裡
+          if ((c + 1) * CH + 2 + OPP.ramp > rd.iMax || c * CH < rd.iMin) continue; // 道路資料還沒生成到這裡（多等一段：對向車道要看前面有沒有交流道、隧道）
           const free = slots.find((sl) => sl.chunk < 0);
           if (!free) { budget = 0; break; }
           build(free, c, src);

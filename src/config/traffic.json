@@ -1,5 +1,6 @@
 {
   "wallGap": 24,
+  "oncoming": { "maxCars": 20, "perKm": 11, "ahead": 1050, "behind": 220 },
   "maxCars": 40,
   "densityPerKm": 16,
   "spawnAheadMin": 900,

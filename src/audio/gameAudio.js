@@ -203,6 +203,17 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
       og.gain.setValueAtTime(0.0001, t + 0.03); og.gain.linearRampToValueAtTime(0.05, t + 0.04); og.gain.linearRampToValueAtTime(0.0001, t + 0.12);
       o.connect(og); og.connect(sfxBus); o.start(t + 0.03); o.stop(t + 0.14);
     },
+    /** 逆向警告的警示音：兩聲短促的方波 */
+    alarm() {
+      if (!ctx || suspended) return;
+      const t = ctx.currentTime;
+      for (let k = 0; k < 2; k++) {
+        const o = ctx.createOscillator(), g = ctx.createGain(), t0 = t + k * 0.16;
+        o.type = 'square'; o.frequency.value = k ? 880 : 1175;
+        g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.07, t0 + 0.01); g.gain.setValueAtTime(0.07, t0 + 0.1); g.gain.linearRampToValueAtTime(0.0001, t0 + 0.13);
+        o.connect(g); g.connect(sfxBus); o.start(t0); o.stop(t0 + 0.15);
+      }
+    },
     /** 跳到下一首：目前這首很快淡掉，下一首直接開始 */
     nextTrack() { if (bgmBus && pool().length > 1 && cur && !suspended) { fadeOut(cur, 0.6); startTrack(0.3); } },
     /** 歌單：全部的歌、哪些被取消勾選、開局先播哪一首 */
