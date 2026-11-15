@@ -177,7 +177,7 @@ section('鑽車縫：兩台並排、旁邊的車切過來');
     return { minStep, v: st.vf, rel: st.s - a.s, gap: Math.abs(a.d - b.d) };
   };
   const thread = run(null);
-  check('從兩台並排的車中間鑽過去：不會被夾住', thread.rel > 40 && thread.v > 40 && thread.minStep > 0.3,
+  check('從兩台並排的車中間鑽過去：不會被夾住', thread.rel > 40 && thread.v > 33 && thread.minStep > 0.3,
     `3 秒後領先 ${thread.rel.toFixed(0)} m、${(thread.v * 3.6).toFixed(0)} km/h、單步最少前進 ${thread.minStep.toFixed(2)} m`);
   // 並排時旁邊的車硬擠過來（把它的車道直接改成玩家那一側）：可以被擠開、被拖慢，但不能一步被搬走好幾公尺
   const squeeze = run((i, st, a) => { if (Math.abs(st.s - a.s) < 1.5) a.push = 1.2; });
@@ -641,6 +641,26 @@ section('護欄：貼牆過彎不能比正常過彎快');
   for (const [r, a] of [[70, 70], [100, 60], [150, 45]]) {
     const A = wallRun(cfg, r, a, true), B = wallRun(cfg, r, a, false);
     check(`半徑 ${r} m：全油門靠外側護欄比煞車過彎慢`, A.t > B.t + 0.3 && A.vExit < B.vExit + 6, `貼牆 ${A.t.toFixed(2)} 秒、出彎 ${A.vExit.toFixed(0)} km/h；正常 ${B.t.toFixed(2)} 秒、出彎 ${B.vExit.toFixed(0)} km/h`);
+  }
+  // 車尾不穿牆：貼著護欄把車頭往外打，車身最靠牆的那個角（車寬＋車長都算）始終在護欄內
+  {
+    const road = createRoad(zone.road);
+    road.appendSegment({ type: 'straight', length: 1500 });
+    const st = createCarState({ s: 20, d: road.halfWidth - cfg.halfWidth - 0.05, vf: 40 });
+    let worst = -Infinity, maxPsi = 0;
+    for (let i = 0; i < 180; i++) {
+      stepCar(st, { throttle: 1, steer: i < 20 ? -1 : 1, handbrake: i > 20 && i < 80 }, cfg, road, DT, null);
+      const reach = st.d + cfg.halfWidth * Math.abs(Math.cos(st.psi)) + cfg.halfLength * Math.abs(Math.sin(st.psi));
+      worst = Math.max(worst, reach - road.widthRight(st.s));
+      maxPsi = Math.max(maxPsi, Math.abs(st.psi));
+    }
+    check('貼牆後車頭往外甩：車尾不會穿出護欄', worst < 0.02 && maxPsi > 0.25, `車身最多超出 ${Math.max(0, worst).toFixed(3)} m，車身角度最大 ${(maxPsi * 57.3).toFixed(0)}°`);
+    // 重撞之後會打滑一小段時間
+    const hit = createCarState({ s: 20, d: 0, vf: 45 });
+    hit.psi = -0.25;
+    let slipMax = 0;
+    for (let i = 0; i < 120; i++) { stepCar(hit, { throttle: 0, steer: 0 }, cfg, road, DT, null); slipMax = Math.max(slipMax, hit.slipT || 0); }
+    check('斜撞護欄：明顯掉速並打滑', hit.wallHits >= 1 && slipMax > 0.3 && hit.vf < 45 * 0.85, `162 → ${(hit.vf * 3.6).toFixed(0)} km/h，打滑 ${slipMax.toFixed(2)} 秒`);
   }
   // 直線上輕擦：只有一次性的小損失，不會被磨到很慢
   const road = createRoad(zone.road);

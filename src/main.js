@@ -553,6 +553,7 @@ function computePose(s, d, psi, out, rd = road) {
   out.l.copy(R).multiplyScalar(-c).addScaledVector(T, -sn);
 }
 
+const camWall = { r: null, d: 0, wl: 0, wr: 0 };
 let gaugeTick = 0, lastGray = 0;
 let debugTick = 0;
 const jctInfo = { left: null, right: null, dist: 0, side: 0 };
@@ -619,9 +620,13 @@ function render(alpha, dt) {
 
   const kmh = Math.abs(state.vf) * 3.6;
   if (!started) { titleTime += dt; rig.orbit(pose, titleTime); }
-  else rig.update(pose, {
-    kmh, vFrac: Math.min(1, kmh / playerCfg.vMaxKmh), steer: state.steer, lookBack: input.held.lookBack,
-  }, paused ? 0 : dt);
+  else {
+    road.frame(state.s, fr);
+    camWall.r = fr.r; camWall.d = state.d; camWall.wl = fr.wl; camWall.wr = fr.wr;
+    rig.update(pose, {
+      kmh, vFrac: Math.min(1, kmh / playerCfg.vMaxKmh), steer: state.steer, lookBack: input.held.lookBack, wall: camWall,
+    }, paused ? 0 : dt);
+  }
   sky.position.copy(rig.camera.position);
 
   streamer.update(state.s, rig.camera);

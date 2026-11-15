@@ -20,7 +20,7 @@ export function wallRun(cfg, radius, angle, ride) {
   let t = 0, vExit = 0, vMin = Infinity;
   while (st.s < sExit + 300 && t < 60) {
     if (ride) { inp.throttle = 1; inp.brake = 0; inp.steer = 0; inp.analog = true; }
-    else drive(st, cfg, road, { dt: DT, line: true, gripUse: 0.92 }, inp);
+    else drive(st, cfg, road, { dt: DT, line: true, gripUse: 0.8 }, inp);
     stepCar(st, inp, cfg, road, DT, null);
     t += DT;
     if (st.s >= sExit && !vExit) vExit = st.vf;

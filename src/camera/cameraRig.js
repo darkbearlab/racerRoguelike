@@ -42,7 +42,7 @@ export function createCameraRig(cfg) {
 
     /**
      * pose: { p, f, u, l }（THREE.Vector3：位置、前、上、左）
-     * info: { kmh, vFrac, steer, lookBack }
+     * info: { kmh, vFrac, steer, lookBack, wall: { r: 道路右向量, d: 車子的橫向位置, wl, wr } }
      */
     update(pose, info, dt) {
       t += dt;
@@ -58,6 +58,13 @@ export function createCameraRig(cfg) {
         // 速度越快鏡頭略往後拉，車子在畫面中變小、路面流動更明顯
         const dist = c.back + (c.speedBack || 0) * info.vFrac * info.vFrac;
         pos.copy(pose.p).addScaledVector(camDir, -dist * back).addScaledVector(up, c.height);
+        // 鏡頭不出護欄：車身打橫時鏡頭在車尾後方，會跑到路外面去。沿道路的右向量把它推回兩側護欄之間
+        const w = info.wall;
+        if (w) {
+          const off = (pos.x - pose.p.x) * w.r[0] + (pos.y - pose.p.y) * w.r[1] + (pos.z - pose.p.z) * w.r[2];
+          const dc = w.d + off, lim = Math.min(Math.max(dc, -(w.wl - 0.6)), w.wr - 0.6);
+          if (lim !== dc) { pos.x += w.r[0] * (lim - dc); pos.y += w.r[1] * (lim - dc); pos.z += w.r[2] * (lim - dc); }
+        }
         look.copy(pose.p).addScaledVector(pose.f, c.lookAhead * back).addScaledVector(up, 0.9);
         camera.near = 0.3;
       } else {

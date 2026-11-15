@@ -107,8 +107,11 @@ export function stepCar(st, input, cfg, road, dt, events) {
   // ── 橫向：車身轉動後速度向量留在原方向，再由抓地力拉回
   let vl = st.vl + st.vf * r * dt;
   vf -= st.vl * r * dt;
-  const grip = drift ? cfg.gripDrift : cfg.grip;
-  const latMax = cfg.latAccelMax * (drift ? cfg.driftLatMul : 1);
+  // 撞牆後的打滑：一小段時間內抓地力大減
+  const slipping = st.slipT > 0;
+  if (slipping) st.slipT -= dt;
+  const grip = (drift ? cfg.gripDrift : cfg.grip) * (slipping ? cfg.wallSlipGrip ?? 0.3 : 1);
+  const latMax = cfg.latAccelMax * (drift ? cfg.driftLatMul : 1) * (slipping ? 0.6 : 1);
   const aLat = clamp(-grip * vl, -latMax, latMax);
   const dvl = aLat * dt;
   vl = Math.abs(dvl) > Math.abs(vl) ? 0 : vl + dvl;
@@ -127,7 +130,8 @@ export function stepCar(st, input, cfg, road, dt, events) {
 
   // ── 護欄：限制 d 的範圍，依撞擊角度扣速度，車頭轉回沿路方向
   //    左右寬度逐點查詢（匯入路段左側會多一個車道）
-  const body = cfg.halfWidth + 0.5 * Math.abs(dsin(psi));
+  //    車身佔的橫向範圍要連車長一起算：車頭轉開時車尾會往護欄掃過去，只算車寬的話車尾會穿進牆裡
+  const body = cfg.halfWidth * Math.abs(dcos(psi)) + (cfg.halfLength ?? 2.2) * Math.abs(dsin(psi));
   const sNext = st.s + sdot * dt;
   const limR = road.widthRight(sNext) - body;
   const limL = road.widthLeft(sNext) - body;
@@ -149,9 +153,16 @@ export function stepCar(st, input, cfg, road, dt, events) {
         const loss = lerp(cfg.wallLossGraze, cfg.wallLossHeadOn, sinA) - (st.wallCool > 0 ? cfg.wallLossGraze : 0);
         ut *= 1 - loss;
         st.wallHits++;
-        if (events) events.emit('wallHit', { loss, speedLoss: speed * loss, side, sinA });
-      }
-      ud = -side * Math.min(vout * cfg.wallBounce, 1.5);
+        // 撞得夠重：輪胎暫時抓不住（打滑），車身被彈開、車頭也被帶偏，要自己救回來
+        let slip = 0;
+        if (cfg.wallSlipMin != null && vout > cfg.wallSlipMin) {
+          slip = clamp(vout * (cfg.wallSlipPerMs ?? 0.1), 0.3, cfg.wallSlipMax ?? 1);
+          st.slipT = Math.max(st.slipT || 0, slip);
+          psi += side * Math.min(cfg.wallSlipKick ?? 0.1, vout * 0.015);
+        }
+        if (events) events.emit('wallHit', { loss, speedLoss: speed * loss, side, sinA, slip });
+        ud = -side * Math.min(vout * (slip ? cfg.wallSlipBounce ?? 0.3 : cfg.wallBounce), slip ? 3.5 : 1.5);
+      } else ud = -side * Math.min(vout * cfg.wallBounce, 1.5);
     }
     // 貼牆摩擦：基本值，加上「護欄替你轉了多少彎」——車速超過這個彎的抓地極限、靠外側護欄把車掰過去時，
     // 超出的向心力由護欄提供，摩擦跟著變大（直線上輕擦幾乎不受影響；急彎全油門靠牆會被磨得很慢）
@@ -171,7 +182,18 @@ export function stepCar(st, input, cfg, road, dt, events) {
     vl = ut * sp + ud * cp;
     st.wallContact = 0.12;
     st.wallCool = 0.5;
-  } else if (st.wallCool > 0) st.wallCool -= dt;
+  } else if (st.wallCool > 0) {
+    st.wallCool -= dt;
+    // 剛被護欄彈開的這半秒：還是靠那道護欄在過彎（彈開、滑回去、再彈開），貼牆過彎的摩擦照算，
+    // 否則一路彈著走反而比貼著磨還快
+    const lean = Math.max(0, ut * ut * kappa * st.wallSide - cfg.latAccelMax * (cfg.wallRideFree ?? 1));
+    if (lean > 0) {
+      const scrape = (cfg.wallRideMu ?? 0) * lean * dt;
+      ut = Math.abs(ut) <= scrape ? ut : ut - Math.sign(ut) * scrape;
+      vf = ut * cp - ud * sp;
+      vl = ut * sp + ud * cp;
+    }
+  }
 
   // ── 交流道分隔島前的楔形緩衝：把車往兩側推開，只算輕擦，不會卡在中間
   const gore = road.gore(sNext);
