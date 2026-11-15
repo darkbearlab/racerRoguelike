@@ -343,5 +343,32 @@ section('事件：警車、塞車、送貨');
     check('送達後節點結束、目標車離開', nodes0 >= 1 && !d.E.courier && (!d.E.rival.active || d.E.rival.mode === 'leave' || d.E.rival.def.tier !== 'courier'), !d.E.rival.active ? '目標車已離開' : d.E.rival.def.tier !== 'courier' ? '目標車已離開，下一個節點的對手已經出現' : '目標車減速靠邊中');
   }
 }
+section('車流量：尖峰時段／深夜封路');
+{
+  const A = session(['rush_hour']), B = session(['road_closure']);
+  check('尖峰時段 +40%、深夜封路 −35%', near(A.world.trafficDensityMul, 1.4, 1e-9) && near(B.world.trafficDensityMul, 0.65, 1e-9));
+  const rush = A.upgrades.defs.get('rush_hour'), closure = A.upgrades.defs.get('road_closure');
+  let offered = 0;
+  const rng = { next: (() => { let x = 1; return () => (x = (x * 16807) % 2147483647) / 2147483647; })() };
+  for (let i = 0; i < 300; i++) if (A.upgrades.offer(rng, 'boss', 3).includes(closure)) offered++;
+  check('兩張互斥：拿了一張，另一張拿不了、也不會再出現', !A.upgrades.canTake(closure) && !B.upgrades.canTake(rush) && !A.upgrades.add('road_closure') && offered === 0 && session().upgrades.canTake(closure));
+
+  // 對手帶的車流成長：他在場時和玩家的相乘，總倍率有上下限
+  const yasha = rivals.find((r) => r.id === 'yasha'), typhoon = rivals.find((r) => r.id === 'typhoon');
+  const R = session([], { mode: 'run' });
+  const dy = R.dress(yasha), dt = R.dress(typhoon);
+  check('夜叉帶尖峰時段、颶風帶深夜封路', near(dy.world.trafficDensityMul, 1.4, 1e-9) && near(dt.world.trafficDensityMul, 0.65, 1e-9) && dy.buffList.some((b) => b.def.id === 'rush_hour') && dt.buffList.some((b) => b.def.id === 'road_closure'));
+  const mulWith = (ids, def) => {
+    const S = session(ids, { mode: 'run' });
+    if (def) { S.rival.active = true; S.rival.def = S.dress(def); S.rival.onAlt = false; S.rival.st.s = S.state.s + 60; }
+    S.step(DT, { throttle: 1, brake: 0, steer: 0 });
+    return S.trafficMul;
+  };
+  const m0 = mulWith([]), mP = mulWith(['road_closure']), mB = mulWith([], yasha), mPB = mulWith(['road_closure'], yasha), mHi = mulWith(['rush_hour', 'nighthawk'], yasha), mLo = mulWith(['road_closure'], typhoon);
+  check('沒有對手時只算玩家的', m0 === 1 && near(mP, 0.65, 1e-9), `無 ×${m0}、封路 ×${mP}`);
+  check('對手在場：雙方相乘（封路可以抵銷 Boss 的尖峰）', near(mB, 1.4, 1e-9) && near(mPB, 0.91, 1e-9), `夜叉 ×${mB}、玩家封路＋夜叉 ×${mPB.toFixed(2)}`);
+  check('總倍率限制在 0.5–1.6', mHi === ucfg.rules.trafficMulMax && mLo === ucfg.rules.trafficMulMin, `尖峰＋夜鷹＋夜叉 ×${mHi}、封路＋颶風 ×${mLo}`);
+}
+
 console.log(failed ? `\n${failed} 項失敗` : '\n成長系統全部通過');
 process.exit(failed ? 1 : 0);

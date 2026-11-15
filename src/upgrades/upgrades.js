@@ -20,6 +20,8 @@ export function createUpgrades(cfg, targets) {
 
     canTake(def) {
       const n = owned.get(def.id) || 0;
+      // 互斥：拿了其中一張，另一張就不能拿（例如增加車流與減少車流）
+      if (def.excludes && def.excludes.some((id) => owned.has(id))) return false;
       return def.stackable ? n < rules.maxStack : n === 0;
     },
     add(id) {

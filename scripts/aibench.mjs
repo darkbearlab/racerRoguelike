@@ -19,6 +19,7 @@ for (const seed of [777, 4242]) for (const def of rivals) {
   let t = 0, race = 0, dist0 = null, brakeStraight = 0, dips = 0, low = false, straightT = 0, vSum = 0;
   while (t < 600) {
     autopilot(S.state, cfg, S.road, { traffic: S.obsForPlayer, mem, dt: DT, speedCap: S.rival.active ? Math.max(20, S.rival.st.vf + (S.rival.st.s - S.state.s - (S.duel.phase === 'racing' ? 80 : 20)) * 0.25) : 45 }, inp);
+    if (process.env.DENS) S.traffic.density = Number(process.env.DENS);
     S.step(DT, inp);
     t += DT;
     if (S.duel.phase === 'marked') S.tryChallenge();

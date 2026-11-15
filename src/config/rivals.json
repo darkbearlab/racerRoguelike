@@ -82,7 +82,7 @@
       "cornerSkill": 1.0, "aggression": 0.9, "block": 0.45, "mistake": 0,
       "special": "cornerKing", "chassis": "輕量掀背",
       "car": { "latAccelMax": 18, "grip": 9.0, "steerLow": 2.4, "steerHigh": 0.8, "brakeDecel": 9.4 },
-      "buffs": ["semi_slicks", "semi_slicks", "tall_gears", "tall_gears", "tall_gears"], "randomBuffs": 2,
+      "buffs": ["semi_slicks", "semi_slicks", "tall_gears", "tall_gears", "tall_gears", "rush_hour"], "randomBuffs": 2,
       "radio": { "intro": "環狀線是我的地盤。跟得上再說。", "win": "彎道裡，沒有人贏得了我。", "lose": "……竟然在彎道輸了。" }
     },
     {
@@ -91,7 +91,7 @@
       "cornerSkill": 0.8, "aggression": 0.85, "block": 0.3, "mistake": 0.05,
       "chassis": "大排氣量轎跑",
       "car": { "latAccelMax": 14.5, "grip": 7.2, "steerLow": 2.0, "steerHigh": 0.62, "brakeDecel": 7.8, "slipstreamDragCut": 0.42 },
-      "buffs": ["tall_gears", "tall_gears", "tall_gears", "tall_gears", "turbo", "turbo", "turbo", "turbo"], "randomBuffs": 2,
+      "buffs": ["tall_gears", "tall_gears", "tall_gears", "tall_gears", "turbo", "turbo", "turbo", "turbo", "road_closure"], "randomBuffs": 2,
       "special": "nitro", "nitro": { "seconds": 3.5, "cooldown": 9, "accel": 5, "topMul": 1.08, "straightAhead": 260 },
       "radio": { "intro": "直線上，你只看得到我的尾燈。", "win": "太慢了。", "lose": "……引擎，還不夠。" }
     },

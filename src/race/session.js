@@ -67,7 +67,8 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
   const rivalStock = rivalBase ? { ...carCfg, ...rivalBase } : { ...carCfg };
   const rivalIn = { ...rivalStock }, rivalOut = { ...rivalStock };
   const rivalDuelBase = { threshold: duelCfg.threshold, scoreMul: 1, keepOnOvertaken: 0 };
-  const rivalUp = upgradeCfg ? createUpgrades(upgradeCfg, { car: { base: rivalIn, out: rivalOut }, duel: { base: rivalDuelBase, out: duel.rivalMods } }) : null;
+  const rivalWorld = { trafficDensityMul: 1 };   // 對手帶的環境類成長（車流量）：他在場時和玩家的相乘
+  const rivalUp = upgradeCfg ? createUpgrades(upgradeCfg, { car: { base: rivalIn, out: rivalOut }, duel: { base: rivalDuelBase, out: duel.rivalMods }, world: { base: { trafficDensityMul: 1 }, out: rivalWorld } }) : null;
   const buffRng = createRng(seed ^ 0x6a09e667);
   /** 把一位對手「裝好」：回傳帶著實際數值與 buff 清單的 def。extra = 額外隨機抽幾個 */
   function dress(def, extra = 0) {
@@ -86,7 +87,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       for (const d of pool) { r -= weights[d.rarity] || 1; if (r <= 0) { pick = d; break; } }
       rivalUp.add(pick.id);
     }
-    return { ...def, stock: { topSpeedKmh: def.topSpeedKmh, power: def.power }, topSpeedKmh: Math.round(rivalOut.vMaxKmh), power: rivalOut.power, car: { ...rivalOut }, buffList: rivalUp.list() };
+    return { ...def, stock: { topSpeedKmh: def.topSpeedKmh, power: def.power }, topSpeedKmh: Math.round(rivalOut.vMaxKmh), power: rivalOut.power, car: { ...rivalOut }, world: { ...rivalWorld }, buffList: rivalUp.list() };
   }
   const menuAi = { mem: createAiMemory(), input: {}, cap: 40 };
   const gridAi = { input: {} };
@@ -551,7 +552,10 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         // ── 時鐘：永遠在走；車流越接近天亮越密
         clock.update(dt);
         const td = runCfg.trafficDensity;
-        traffic.density = (td.night + (td.dawn - td.night) * clock.progress) * world.trafficDensityMul * S.zoneDensity;
+        // 車流量的成長：玩家的和場上對手的相乘，總倍率有上下限（太密會變成慢速車陣，鑽不過去）
+        const ur = upgradeCfg?.rules || {};
+        S.trafficMul = Math.min(ur.trafficMulMax ?? 1.6, Math.max(ur.trafficMulMin ?? 0.5, world.trafficDensityMul * (rival.active ? rival.def.world?.trafficDensityMul ?? 1 : 1)));
+        traffic.density = (td.night + (td.dawn - td.night) * clock.progress) * S.trafficMul * S.zoneDensity;
         if (clock.dawn && !S.over) {
           S.over = { reason: 'dawn' };
           emit('runOver', S.over);

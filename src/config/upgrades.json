@@ -1,5 +1,6 @@
 {
   "rules": {
+    "trafficMulMin": 0.5, "trafficMulMax": 1.6,
     "choiceSeconds": 10,
     "lockSeconds": 0.6,
     "skipBounty": 60,
@@ -87,6 +88,16 @@
       "desc": "得分速度 +20%，被超車時賞金 −40",
       "effects": [{ "target": "duel.scoreMul", "op": "mul", "value": 1.2 }],
       "hook": "onOvertaken", "action": "loseBounty", "params": { "amount": 40 }
+    },
+    {
+      "id": "rush_hour", "name": "尖峰時段", "category": "tradeoff", "rarity": "rare", "stackable": false, "excludes": ["road_closure"],
+      "desc": "車流 +40%（雙方都受影響：領先的要替後車開路，極速高的車發揮不出來）",
+      "effects": [{ "target": "world.trafficDensityMul", "op": "mul", "value": 1.4 }]
+    },
+    {
+      "id": "road_closure", "name": "深夜封路", "category": "tradeoff", "rarity": "rare", "stackable": false, "excludes": ["rush_hour"],
+      "desc": "車流 −35%（雙方都受影響：路越空，極速高的一方越有利）",
+      "effects": [{ "target": "world.trafficDensityMul", "op": "mul", "value": 0.65 }]
     },
     {
       "id": "nighthawk", "name": "夜鷹", "category": "tradeoff", "rarity": "legendary", "stackable": false,
