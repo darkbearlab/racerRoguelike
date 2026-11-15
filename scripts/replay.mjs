@@ -22,7 +22,7 @@ if (!file) {
 }
 const data = JSON.parse(readFileSync(file, 'utf8'));
 const DT = 1 / 60;
-console.log(`${file}\n錄製 ${data.meta.startedAt}　程式版本 ${data.meta.commit || '?'}　${(data.steps * DT).toFixed(1)} 秒（${data.steps} 步）　輸入 ${data.inputs.length} 筆　操作 ${data.calls.length} 筆`);
+console.log(`${file}\n錄製 ${data.meta.startedAt}　程式版本 ${data.meta.savedCommit ? data.meta.savedCommit + (data.meta.savedDirty ? '（有未提交的修改）' : '') : data.meta.commit || '?'}　${(data.steps * DT).toFixed(1)} 秒（${data.steps} 步）　輸入 ${data.inputs.length} 筆　操作 ${data.calls.length} 筆`);
 
 const ev = createEvents();
 let now = 0;

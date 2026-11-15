@@ -110,8 +110,9 @@ export function stepCar(st, input, cfg, road, dt, events) {
   // 撞牆後的打滑：一小段時間內抓地力大減
   const slipping = st.slipT > 0;
   if (slipping) st.slipT -= dt;
-  const grip = (drift ? cfg.gripDrift : cfg.grip) * (slipping ? cfg.wallSlipGrip ?? 0.3 : 1);
-  const latMax = cfg.latAccelMax * (drift ? cfg.driftLatMul : 1) * (slipping ? 0.6 : 1);
+  // 只讓輪胎變「鬆」（橫向速度收得慢，車身會滑一下），能用的側向力上限不變：方向盤還是有反應，救得回來
+  const grip = (drift ? cfg.gripDrift : cfg.grip) * (slipping ? cfg.wallSlipGrip ?? 0.45 : 1);
+  const latMax = cfg.latAccelMax * (drift ? cfg.driftLatMul : 1);
   const aLat = clamp(-grip * vl, -latMax, latMax);
   const dvl = aLat * dt;
   vl = Math.abs(dvl) > Math.abs(vl) ? 0 : vl + dvl;
@@ -155,19 +156,23 @@ export function stepCar(st, input, cfg, road, dt, events) {
         st.wallHits++;
         // 撞得夠重：輪胎暫時抓不住（打滑），車身被彈開、車頭也被帶偏，要自己救回來
         let slip = 0;
-        if (cfg.wallSlipMin != null && vout > cfg.wallSlipMin) {
-          slip = clamp(vout * (cfg.wallSlipPerMs ?? 0.1), 0.3, cfg.wallSlipMax ?? 1);
+        // 半秒內彈回來的第二下不重新起算：否則會一路「撞—滑—再撞」黏在牆邊
+        if (cfg.wallSlipMin != null && vout > cfg.wallSlipMin && !(st.wallCool > 0)) {
+          slip = clamp(vout * (cfg.wallSlipPerMs ?? 0.1), 0.25, cfg.wallSlipMax ?? 0.6);
           st.slipT = Math.max(st.slipT || 0, slip);
-          psi += side * Math.min(cfg.wallSlipKick ?? 0.1, vout * 0.015);
         }
         if (events) events.emit('wallHit', { loss, speedLoss: speed * loss, side, sinA, slip });
-        ud = -side * Math.min(vout * (slip ? cfg.wallSlipBounce ?? 0.3 : cfg.wallBounce), slip ? 3.5 : 1.5);
+        ud = -side * Math.min(vout * (slip ? cfg.wallSlipBounce ?? 0.3 : cfg.wallBounce), slip ? cfg.wallSlipBounceMax ?? 2.5 : 1.5);
       } else ud = -side * Math.min(vout * cfg.wallBounce, 1.5);
     }
     // 貼牆摩擦：基本值，加上「護欄替你轉了多少彎」——車速超過這個彎的抓地極限、靠外側護欄把車掰過去時，
     // 超出的向心力由護欄提供，摩擦跟著變大（直線上輕擦幾乎不受影響；急彎全油門靠牆會被磨得很慢）
+    // 這份加重的摩擦是給「一路靠著牆過彎」的：連續貼牆超過一小段時間才逐漸加上去。
+    // 高速彎失誤撞一下、馬上修回來，只吃撞擊損失和基本摩擦，不會被磨掉一大截車速
+    st.rideT = Math.min(2, (st.rideT || 0) + dt);
+    const ride = clamp((st.rideT - (cfg.wallRideDelay ?? 0.4)) / (cfg.wallRideRamp ?? 0.8), 0, 1);
     const lean = Math.max(0, ut * ut * kappa * side - cfg.latAccelMax * (cfg.wallRideFree ?? 1));
-    const scrape = (cfg.wallScrapeDecel + (cfg.wallRideMu ?? 0) * lean) * dt;
+    const scrape = (cfg.wallScrapeDecel + (cfg.wallRideMu ?? 0) * lean * ride) * dt;
     ut = Math.abs(ut) <= scrape ? ut : ut - Math.sign(ut) * scrape;
     // 車頭若朝向牆，轉回沿路方向（逆向時轉回逆向）
     // 貼牆期間，方向盤不能再把車頭往牆裡轉
@@ -184,16 +189,28 @@ export function stepCar(st, input, cfg, road, dt, events) {
     st.wallCool = 0.5;
   } else if (st.wallCool > 0) {
     st.wallCool -= dt;
+    // 剛被彈開時車頭還朝著牆：慢慢帶回沿路方向（連續地轉，不是瞬間擺正），才不會馬上又滑回去撞第二下
+    if (-dsin(psi) * st.wallSide > 0) {
+      const tgt = Math.abs(psi) > Math.PI / 2 ? Math.sign(psi) * Math.PI : 0;
+      psi += (tgt - psi) * Math.min(1, 5 * dt);
+      cp = dcos(psi); sp = dsin(psi);
+      vf = ut * cp - ud * sp;
+      vl = ut * sp + ud * cp;
+    }
     // 剛被護欄彈開的這半秒：還是靠那道護欄在過彎（彈開、滑回去、再彈開），貼牆過彎的摩擦照算，
     // 否則一路彈著走反而比貼著磨還快
+    st.rideT = Math.min(2, (st.rideT || 0) + dt);
+    const ride = clamp((st.rideT - (cfg.wallRideDelay ?? 0.4)) / (cfg.wallRideRamp ?? 0.8), 0, 1);
     const lean = Math.max(0, ut * ut * kappa * st.wallSide - cfg.latAccelMax * (cfg.wallRideFree ?? 1));
-    if (lean > 0) {
-      const scrape = (cfg.wallRideMu ?? 0) * lean * dt;
+    if (lean > 0 && ride > 0) {
+      const scrape = (cfg.wallRideMu ?? 0) * lean * ride * dt;
       ut = Math.abs(ut) <= scrape ? ut : ut - Math.sign(ut) * scrape;
       vf = ut * cp - ud * sp;
       vl = ut * sp + ud * cp;
     }
   }
+
+  if (side === 0 && !(st.wallCool > 0) && st.rideT > 0) st.rideT = Math.max(0, st.rideT - 2 * dt);
 
   // ── 交流道分隔島前的楔形緩衝：把車往兩側推開，只算輕擦，不會卡在中間
   const gore = road.gore(sNext);

@@ -56,7 +56,13 @@ function replaySink() {
         const chunks = [];
         req.on('data', (c) => chunks.push(c));
         req.on('end', () => {
-          try { mkdirSync(dir, { recursive: true }); writeFileSync(resolve(dir, `${name}.json`), Buffer.concat(chunks)); res.statusCode = 200; }
+          try {
+            // 存檔當下的程式版本（開發伺服器開很久的話，頁面裡記的版本是啟動時的，會過期）
+            const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            const git = (cmd) => { try { return execSync(cmd, { cwd: import.meta.dirname }).toString().trim(); } catch { return ''; } };
+            data.meta = { ...data.meta, savedCommit: git('git rev-parse --short HEAD'), savedDirty: git('git status --porcelain -- src') !== '' };
+            mkdirSync(dir, { recursive: true }); writeFileSync(resolve(dir, `${name}.json`), JSON.stringify(data)); res.statusCode = 200;
+          }
           catch { res.statusCode = 500; }
           res.end();
         });

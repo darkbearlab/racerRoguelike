@@ -640,7 +640,7 @@ section('護欄：貼牆過彎不能比正常過彎快');
   const { wallRun } = await import('./wallbench.mjs');
   for (const [r, a] of [[70, 70], [100, 60], [150, 45]]) {
     const A = wallRun(cfg, r, a, true), B = wallRun(cfg, r, a, false);
-    check(`半徑 ${r} m：全油門靠外側護欄比煞車過彎慢`, A.t > B.t + 0.3 && A.vExit < B.vExit + 6, `貼牆 ${A.t.toFixed(2)} 秒、出彎 ${A.vExit.toFixed(0)} km/h；正常 ${B.t.toFixed(2)} 秒、出彎 ${B.vExit.toFixed(0)} km/h`);
+    check(`半徑 ${r} m：全油門靠外側護欄比煞車過彎慢`, A.t > B.t + 0.1 && A.vExit < B.vExit - 5, `貼牆 ${A.t.toFixed(2)} 秒、出彎 ${A.vExit.toFixed(0)} km/h；正常 ${B.t.toFixed(2)} 秒、出彎 ${B.vExit.toFixed(0)} km/h`);
   }
   // 車尾不穿牆：貼著護欄把車頭往外打，車身最靠牆的那個角（車寬＋車長都算）始終在護欄內
   {
@@ -661,6 +661,22 @@ section('護欄：貼牆過彎不能比正常過彎快');
     let slipMax = 0;
     for (let i = 0; i < 120; i++) { stepCar(hit, { throttle: 0, steer: 0 }, cfg, road, DT, null); slipMax = Math.max(slipMax, hit.slipT || 0); }
     check('斜撞護欄：明顯掉速並打滑', hit.wallHits >= 1 && slipMax > 0.3 && hit.vf < 45 * 0.85, `162 → ${(hit.vf * 3.6).toFixed(0)} km/h，打滑 ${slipMax.toFixed(2)} 秒`);
+  }
+  // 高速彎斜撞外側護欄後往內修（實際遊玩錄到的情況：以前車頭會瞬間被擺一下、連撞四次、方向盤沒反應）
+  {
+    const bend = { curvature: () => 0.005, widthLeft: () => 6, widthRight: () => 6, gore: () => 0, sMin: -1e9, halfWidth: 6 };
+    const st = createCarState({ s: 0, d: 1.8, vf: 55 });
+    st.psi = -0.18;
+    let snap = 0, freeAt = -1, hitAt = -1;
+    for (let i = 0; i < 220; i++) {
+      const p0 = st.psi, hit = st.wallHits > 0;
+      if (hit && hitAt < 0) hitAt = i;
+      stepCar(st, { throttle: 1, steer: hit ? 1 : 0 }, cfg, bend, DT, null);
+      snap = Math.max(snap, Math.abs(st.psi - p0));
+      if (hit && freeAt < 0 && 6 - st.d > 1.9 && !(st.wallCool > 0)) freeAt = (i - hitAt) * DT;
+    }
+    check('高速彎撞牆：車頭不會瞬間被擺動、不會連環撞、修得回來', st.wallHits >= 1 && st.wallHits <= 3 && snap < 0.05 && freeAt > 0 && freeAt < 2.6,
+      `碰牆 ${st.wallHits} 次，單步車頭最多轉 ${(snap * 57.3).toFixed(1)}°，${freeAt.toFixed(2)} 秒後離開護欄，198 → ${(st.vf * 3.6).toFixed(0)} km/h`);
   }
   // 直線上輕擦：只有一次性的小損失，不會被磨到很慢
   const road = createRoad(zone.road);
