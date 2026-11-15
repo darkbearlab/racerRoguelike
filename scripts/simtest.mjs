@@ -1,6 +1,6 @@
 // 無畫面驗收：無限道路、車流、物理、對決。執行：npm run simtest
 import { readFileSync } from 'node:fs';
-import { createRoad, DS } from '../src/road/spline.js';
+import { createRoad, DS, CAP } from '../src/road/spline.js';
 import { createGenerator } from '../src/road/generator.js';
 import { createCarState, stepCar } from '../src/vehicle/physics.js';
 import { autopilot, createAiMemory } from '../src/vehicle/ai.js';
@@ -42,9 +42,12 @@ const over = (st, road) => Math.max(st.d - (road.widthRight(st.s) - cfg.halfWidt
 section('道路生成');
 {
   const w = world(7);
-  let maxKink = 0, maxHead = 0, minSelf = Infinity, prevTheta = 0, seen = 0;
+  let maxKink = 0, maxHead = 0, minSelf = Infinity, prevTheta = 0, seen = 0, minBehind = Infinity, maxSpan = 0;
   for (let s = 0; s < 300000; s += 400) {
     advanceRoad(w, s);
+    // 對手可能落後玩家幾百公尺，回收點跟著他走：多留 1000 m 也不能被擠掉
+    if (s > 2000) minBehind = Math.min(minBehind, s - w.road.sMin);
+    maxSpan = Math.max(maxSpan, w.road.sMax - (s - BEHIND));
     for (let i = Math.max(seen, w.road.iMin + 1); i <= w.road.iMax; i++) {
       const th = w.road.nodeTheta(i);
       maxKink = Math.max(maxKink, Math.abs(th - prevTheta));
@@ -67,7 +70,8 @@ section('道路生成');
   check('生成 300 km：視窗內不自我交叉', minSelf > 60, `相隔 240 m 以上的路段最近 ${minSelf.toFixed(0)} m`);
   check('生成 300 km：各類路段都有出現', Object.entries(st).every(([k, n]) => k === 'junction' || n > 0),
     Object.entries(st).map(([k, n]) => `${k} ${n}`).join('、'));
-  check('道路緩衝區不成長', w.road.iMax - w.road.iMin < 2048, `視窗 ${(w.road.iMax - w.road.iMin) * DS} m`);
+  check('道路緩衝區不成長', w.road.iMax - w.road.iMin < CAP, `視窗 ${(w.road.iMax - w.road.iMin) * DS} m`);
+  check('生成 300 km：新路段不會把車子腳下的路擠掉', minBehind >= BEHIND - DS && maxSpan + 1000 < (CAP - 4) * DS, `後方最少保留 ${minBehind.toFixed(0)} m；最長需要 ${maxSpan.toFixed(0)} m，容量 ${(CAP - 4) * DS} m`);
 }
 
 section('車流（自動駕駛 20 分鐘，無對手）');
@@ -354,7 +358,7 @@ section('交流道幾何（連續生成 60 個）');
   check('兩條分支的內側護欄不交錯', minSep > -0.02, `分歧後 300 m 內最小間距 ${minSep.toFixed(2)} m`);
   check('分支寬度合理', widthsOk && minInner > 2, `可行駛寬度最窄 ${minInner.toFixed(1)} m（扣掉車寬）`);
   check('分支無折角', maxKink < 0.07, `最大轉角 ${(maxKink * 57.3).toFixed(2)}°（每 ${DS} m）`);
-  check('連續插入 60 個交流道', n === 60 && w.road.iMax - w.road.iMin < 2048, `朝向最後 ${w.gen.heading.toFixed(0)}°`);
+  check('連續插入 60 個交流道', n === 60 && w.road.iMax - w.road.iMin < CAP, `朝向最後 ${w.gen.heading.toFixed(0)}°`);
 }
 
 section('通過分歧點：各種橫向位置與速度');

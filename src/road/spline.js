@@ -12,7 +12,9 @@
 // 所以「主線」這個物件永遠是玩家所在的路，其他模組不必換參考。
 import { dcos, dhypot, dsin } from '../core/dmath.js';
 export const DS = 2;
-const CAP = 2048;
+// 容量要遠大於「後方保留 + 前方生成 + 一次生成的最長一組路段」：不夠的話新路段會把車子腳下的路擠掉，
+// 取樣被夾在視窗起點，畫面上車子就停在原地只會橫移，直到實際位置追上來
+export const CAP = 4096;
 const MASK = CAP - 1;
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
