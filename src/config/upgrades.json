@@ -84,9 +84,9 @@
     },
     {
       "id": "gambler", "name": "賭徒", "category": "tradeoff", "rarity": "legendary", "stackable": false,
-      "desc": "得分速度 +20%，被超車時扣 5 分鐘",
+      "desc": "得分速度 +20%，被超車時賞金 −40",
       "effects": [{ "target": "duel.scoreMul", "op": "mul", "value": 1.2 }],
-      "hook": "onOvertaken", "action": "loseTime", "params": { "minutes": 5 }
+      "hook": "onOvertaken", "action": "loseBounty", "params": { "amount": 40 }
     },
     {
       "id": "nighthawk", "name": "夜鷹", "category": "tradeoff", "rarity": "legendary", "stackable": false,

@@ -438,7 +438,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
         }
         else {
           const lose = duelCfg.loseMinutesByTier?.[tier] ?? duelCfg.loseMinutes;
-          // 輸給警車：除了時間還要罰錢
+          // 落敗預設不罰時間（設定檔可以給）；輸給警車要罰錢
           const fine = Math.min(S.run.bounty, duelCfg.loseBountyByTier?.[tier] ?? 0);
           S.run.bounty -= fine;
           S.run.losses++; S.run.penaltyMin += lose;
@@ -733,7 +733,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
 
   if (upgrades) {
     S.menus = createMenus({ upgrades, rng: menuRng, run: S.run, emit, pa: runCfg?.pa, onTime: (min) => { if (clock) clock.spend(-min); } });
-    // 被超車時觸發的成長（例如賭徒：扣時間）
+    // 被超車時觸發的成長（例如賭徒：扣賞金）
     ev.on('duelZero', (e) => {
       if (e.who !== 'player') return;
       const fired = upgrades.fire('onOvertaken', S, e);

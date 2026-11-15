@@ -40,6 +40,11 @@ export const ACTIONS = {
     S.state.boostAccel = p.accel * count;
     return true;
   },
+  /** 扣賞金（不會扣成負的） */
+  loseBounty(S, p, count) {
+    S.run.bounty -= Math.min(S.run.bounty, p.amount * count);
+    return true;
+  },
   /** 扣時間 */
   loseTime(S, p, count) {
     if (S.clock) S.clock.spend(p.minutes * count);

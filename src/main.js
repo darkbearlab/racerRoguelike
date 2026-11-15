@@ -220,7 +220,7 @@ events.on('timeBought', (e) => hud.toast(`補給完成　天亮延後 ${e.minute
 events.on('upgradeGained', (e) => hud.toast(`獲得成長：${e.def.name}`, 2));
 events.on('upgradeRemoved', (e) => hud.toast(`移除成長：${e.def.name}`, 2));
 events.on('menuSkipped', (e) => hud.toast(e.empty ? `沒有成長可拿了　賞金 +${e.bounty}` : `未選擇　賞金 +${e.bounty}`, 2));
-events.on('hookFired', (e) => { if (e.hook === 'onOvertaken') hud.toast('賭徒：被超車 −5 分鐘', 1.8); });
+events.on('hookFired', (e) => { if (e.hook === 'onOvertaken') hud.toast('賭徒：被超車　賞金 −40', 1.8); });
 events.on('runOver', (e) => {
   const win = e.reason === 'victory';
   hud.over([
@@ -304,7 +304,10 @@ events.on('duelEnd', (e) => {
   if (e.win) playerTauntT = 6;
   const tier = rival.def?.tier || 'normal';
   const fine = duelCfg.loseBountyByTier?.[tier];
-  hud.banner(e.win, e.reason, e.win ? `賞金 +${duelCfg.bountyByTier?.[tier] ?? duelCfg.bounty}` : `−${duelCfg.loseMinutesByTier?.[tier] ?? duelCfg.loseMinutes} 分鐘${fine ? `　罰金 ${fine}` : ''}`);
+  // 落敗不另外罰時間（纏鬥花掉的時間本身就是代價）；設定檔裡有給罰時或罰金才顯示
+  const mins = duelCfg.loseMinutesByTier?.[tier] ?? duelCfg.loseMinutes;
+  const lost = [mins ? `−${mins} 分鐘` : '', fine ? `罰金 ${fine}` : ''].filter(Boolean).join('　');
+  hud.banner(e.win, e.reason, e.win ? `賞金 +${duelCfg.bountyByTier?.[tier] ?? duelCfg.bounty}` : lost);
 });
 
 // 自動駕駛選路：優先選對決節點

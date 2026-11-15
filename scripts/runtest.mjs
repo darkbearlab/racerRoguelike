@@ -203,7 +203,7 @@ section('Boss');
   const bossDuels = log.duels.filter((d) => d.tier === 'boss');
   check('輸給 Boss 後可再挑戰並通關', bossDuels.length === 2 && !bossDuels[0].win && bossDuels[1].win && S.over?.reason === 'victory',
     bossDuels.map((d) => `${d.name}${d.win ? '勝' : '敗'}`).join(' → '));
-  check('輸給 Boss 扣 30 分鐘', S.run.penaltyMin >= 30 && dcfg.loseMinutesByTier.boss === 30, `累計時間懲罰 ${S.run.penaltyMin} 分鐘`);
+  check('輸給 Boss 不另外罰時間', S.run.losses >= 1 && S.run.penaltyMin === 0 && S.clock.penaltyTotal === 0, `落敗 ${S.run.losses} 次，累計時間懲罰 ${S.run.penaltyMin} 分鐘`);
 
   // 登場：從後方出現、超到玩家前方後才能挑戰
   const { S: B, ev } = make(77, { boss: { ...rcfg.boss, afterDefeats: 0 } });

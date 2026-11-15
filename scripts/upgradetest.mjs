@@ -133,10 +133,10 @@ section('範例成長：取捨');
   check('窮途末路：極速 +12 km/h，轉向力 −10%', near(t1 - t0, 12, 0.8) && near(y1 / y0, 0.9, 0.01),
     `極速 ${t0.toFixed(1)} → ${t1.toFixed(1)} km/h；低速偏航 ${y0.toFixed(2)} → ${y1.toFixed(2)} rad/s`);
 
-  const rate = (ids) => { const S = session(ids, { mode: 'run' }); const go = racing(S); go(40.001, 1); const r = S.duel.scoreP; const m0 = S.clock.minute; go(-10, 0.1); return { r, lost: S.clock.minute - m0 }; };
+  const rate = (ids) => { const S = session(ids, { mode: 'run' }); const go = racing(S); go(40.001, 1); const r = S.duel.scoreP; const m0 = S.clock.minute; S.run.bounty = 100; go(-10, 0.1); return { r, lost: S.clock.minute - m0, paid: 100 - S.run.bounty }; };
   const g0 = rate([]), g1 = rate(['gambler']);
-  check('賭徒：得分速度 +20%，被超車時扣 5 分鐘', near(g1.r / g0.r, 1.2, 1e-6) && near(g1.lost, 5, 1e-9) && g0.lost === 0,
-    `剛過門檻每秒 ${g0.r.toFixed(1)} → ${g1.r.toFixed(1)} 分；被超車時鐘 +${g1.lost.toFixed(0)} 分鐘（無成長 +${g0.lost}）`);
+  check('賭徒：得分速度 +20%，被超車時賞金 −40（不扣時間）', near(g1.r / g0.r, 1.2, 1e-6) && g1.paid === 40 && g0.paid === 0 && near(g1.lost, 0, 1e-9) && g0.lost === 0,
+    `剛過門檻每秒 ${g0.r.toFixed(1)} → ${g1.r.toFixed(1)} 分；被超車賞金 −${g1.paid}（無成長 −${g0.paid}），時鐘 +${g1.lost.toFixed(0)} 分鐘`);
 
   const thr = (ids) => { const S = session(ids); const go = racing(S); go(30, 1); return S.duel.scoreP; };
   const nh = session(['nighthawk'], { mode: 'run', traffic: tcfg });
@@ -318,7 +318,7 @@ section('事件：警車、塞車、送貨');
     drive(L, 60, () => L.rival.active); drive(L, 60, () => L.duel.phase === 'racing');
     L.run.bounty = 200; const m0 = L.clock.minute;
     L.duel.finish(false, 'score'); L.step(DT, inp);
-    check('輸警車：罰金加罰時間', L.run.bounty === 200 - dcfg.loseBountyByTier.police && near(L.clock.minute - m0, dcfg.loseMinutesByTier.police, 0.1), `賞金 200 → ${L.run.bounty}，時鐘 +${(L.clock.minute - m0).toFixed(0)} 分鐘`);
+    check('輸警車：只罰金、不罰時間', L.run.bounty === 200 - dcfg.loseBountyByTier.police && near(L.clock.minute - m0, 0, 0.1), `賞金 200 → ${L.run.bounty}，時鐘 +${(L.clock.minute - m0).toFixed(0)} 分鐘`);
   }
   // 塞車：越快越多，撞到會扣
   {
