@@ -290,10 +290,11 @@ console.log('      各 8 場統計（玩家由自動駕駛代打，僅供平衡�
 tally.forEach((y, i) => console.log(`      ${rivals[i].name}：玩家 ${y.win} 勝 ${y.lose} 敗，平均 ${(y.time / (y.win + y.lose || 1)).toFixed(0)} 秒，歸零共 ${y.zeros} 次`));
 
 section('對手 AI 不卡牆（三位對手各獨自跑 10 分鐘對決狀態）');
+let paceSum = 0;
 for (const def of rivals) {
   const S = createSession({ seed: 777, carCfg: cfg, zone, trafficCfg: tcfg, duelCfg: { ...dcfg, targets: { normal: 1e9 }, breakaway: 1e9 }, rivals: [def], mode: 'loop' });
   const inp = {}, mem = createAiMemory();
-  let t = 0, slow = 0, stuck = 0, maxStuck = 0, maxOverR = 0;
+  let t = 0, slow = 0, stuck = 0, maxStuck = 0, maxOverR = 0, d0 = null;
   while (t < 600) {
     // 玩家以定速跟在附近，讓車流與對手都維持在模擬範圍內
     autopilot(S.state, cfg, S.road, { traffic: S.obsForPlayer, mem, dt: DT, speedCap: S.rival.active ? Math.max(20, S.rival.st.vf + (S.rival.st.s - S.state.s - (S.duel.phase === 'racing' ? 80 : 20)) * 0.25) : 45 }, inp);
@@ -302,6 +303,7 @@ for (const def of rivals) {
     if (S.duel.phase === 'marked') S.tryChallenge();
     if (S.duel.phase === 'racing') {
       const rs = S.rival.st;
+      if (d0 == null) d0 = rs.dist;
       maxOverR = Math.max(maxOverR, over(rs, S.road));
       if (rs.vf < 30 / 3.6) { slow += DT; stuck += DT; maxStuck = Math.max(maxStuck, stuck); } else stuck = 0;
     }
@@ -309,7 +311,11 @@ for (const def of rivals) {
   const rs = S.rival.st;
   check(`${def.name}：不卡住、不穿牆`, maxStuck < 5 && maxOverR < 0.02 && S.duel.time > 500,
     `對決狀態 ${S.duel.time.toFixed(0)} 秒，行駛 ${(rs.dist / 1000).toFixed(1)} km，碰牆 ${rs.wallHits} 次、撞車 ${rs.carHits || 0} 次，低於 30 km/h 共 ${slow.toFixed(1)} 秒（最長連續 ${maxStuck.toFixed(1)} 秒）`);
+  paceSum += (rs.dist - d0) / S.duel.time * 3.6 / def.topSpeedKmh;
 }
+
+// 車流裡不能一遇到車就跟到底：整段平均車速（含彎道）全體平均要有極速的四分之三（只會跟車的舊版約 72%）
+check('對手在車流裡維持車速', paceSum / rivals.length > 0.75, `平均車速是極速的 ${(paceSum / rivals.length * 100).toFixed(0)}%`);
 
 section('交流道幾何（連續生成 60 個）');
 {
