@@ -255,6 +255,8 @@ export function createTraffic(road, rng, cfg) {
         const pds = p.s - c.s;
         if (pds > 0 && pds < 90 && Math.abs(p.d - c.d) < (1.8 + c.wid) / 2 + 0.4) {
           const g = pds - (4.4 + c.len) / 2;
+          // 賽車已經和我並排重疊（被擠在我和護欄之間）：那不是前車，為它煞車只會兩台一起慢到停、誰也出不去
+          if (g < -1) continue;
           if (g < gap) { gap = g; lead = Math.max(0, p.v); }
         }
       }

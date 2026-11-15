@@ -144,15 +144,18 @@ export function stepCar(st, input, cfg, road, dt, events) {
       // 撞擊只在剛接觸時扣一次；持續貼牆只算摩擦，不會被一路扣到停
       if (vout > 1.0 && !wasContact) {
         const sinA = clamp(vout / Math.max(speed, 1), 0, 1);
-        const loss = lerp(cfg.wallLossGraze, cfg.wallLossHeadOn, sinA);
+        // 碰牆後常會彈開再碰：半秒內的第二下不再重扣「輕擦」那一份，只扣撞擊角度多出來的部分
+        const loss = lerp(cfg.wallLossGraze, cfg.wallLossHeadOn, sinA) - (st.wallCool > 0 ? cfg.wallLossGraze : 0);
         ut *= 1 - loss;
         st.wallHits++;
         if (events) events.emit('wallHit', { loss, speedLoss: speed * loss, side, sinA });
       }
       ud = -side * Math.min(vout * cfg.wallBounce, 1.5);
     }
-    // 貼牆摩擦
-    const scrape = cfg.wallScrapeDecel * dt;
+    // 貼牆摩擦：基本值，加上「護欄替你轉了多少彎」——車速超過這個彎的抓地極限、靠外側護欄把車掰過去時，
+    // 超出的向心力由護欄提供，摩擦跟著變大（直線上輕擦幾乎不受影響；急彎全油門靠牆會被磨得很慢）
+    const lean = Math.max(0, ut * ut * kappa * side - cfg.latAccelMax * (cfg.wallRideFree ?? 1));
+    const scrape = (cfg.wallScrapeDecel + (cfg.wallRideMu ?? 0) * lean) * dt;
     ut = Math.abs(ut) <= scrape ? ut : ut - Math.sign(ut) * scrape;
     // 車頭若朝向牆，轉回沿路方向（逆向時轉回逆向）
     // 貼牆期間，方向盤不能再把車頭往牆裡轉
@@ -166,7 +169,8 @@ export function stepCar(st, input, cfg, road, dt, events) {
     vf = ut * cp - ud * sp;
     vl = ut * sp + ud * cp;
     st.wallContact = 0.12;
-  }
+    st.wallCool = 0.5;
+  } else if (st.wallCool > 0) st.wallCool -= dt;
 
   // ── 交流道分隔島前的楔形緩衝：把車往兩側推開，只算輕擦，不會卡在中間
   const gore = road.gore(sNext);

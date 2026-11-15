@@ -26,9 +26,11 @@
     "slideScrub": 0.3,
     "slideScrubDrift": 0.1,
 
-    "wallLossGraze": 0.03,
+    "wallLossGraze": 0.06,
     "wallLossHeadOn": 0.35,
     "wallScrapeDecel": 2.0,
+    "wallRideMu": 1.0,
+    "wallRideFree": 0.6,
     "wallBounce": 0.15,
 
     "slipstreamRange": 30,
