@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
-import { readdirSync } from 'node:fs';
+import { readdirSync, mkdirSync, writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 // 背景音樂清單：掃 public/audio/bgm 資料夾，丟進去的 mp3 / ogg 就會進隨機歌單，不用手動維護。
@@ -43,8 +44,32 @@ function bgmList() {
   };
 }
 
+// 重播紀錄：開發伺服器收到遊戲送來的紀錄就寫進 replays/（不進 repo），事後用 scripts/replay.mjs 重跑分析
+function replaySink() {
+  const dir = resolve(import.meta.dirname, 'replays');
+  return {
+    name: 'replay-sink',
+    configureServer(server) {
+      server.middlewares.use('/__replay', (req, res) => {
+        const name = (new URL(req.url, 'http://x').searchParams.get('name') || '').replace(/[^\w-]/g, '');
+        if (req.method !== 'POST' || !name) { res.statusCode = 400; res.end(); return; }
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => {
+          try { mkdirSync(dir, { recursive: true }); writeFileSync(resolve(dir, `${name}.json`), Buffer.concat(chunks)); res.statusCode = 200; }
+          catch { res.statusCode = 500; }
+          res.end();
+        });
+      });
+    },
+  };
+}
+let commit = '';
+try { commit = execSync('git rev-parse --short HEAD', { cwd: import.meta.dirname }).toString().trim(); } catch { /* 不在 git 裡就留空 */ }
+
 // base 用相對路徑：建置出來的檔案放在網域根目錄或子路徑（GitHub Pages 的 /racerRoguelike/）都能跑
 export default defineConfig({
   base: './',
-  plugins: [bgmList()],
+  plugins: [bgmList(), replaySink()],
+  define: { __COMMIT__: JSON.stringify(commit) },
 });

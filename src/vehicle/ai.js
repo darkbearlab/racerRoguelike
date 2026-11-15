@@ -2,6 +2,7 @@
 // - 目標速度：往前看道路曲率算安全過彎速度，提前煞車
 // - 目標橫向位置：彎道走外→內→外的賽車線，直線就近保持車道
 // - 避讓車流：選較空的車道，對擋路的車煞車
+import { dlog } from '../core/dmath.js';
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
 export function createAiMemory(lane = 1) {
@@ -160,7 +161,7 @@ export function drive(st, cfg, road, o = {}, out = {}) {
           const E = Math.abs(dTarget - st.d);
           // 橫向誤差大致照指數收斂（前視點轉向），時間常數隨車速變
           const tau = (8 + 0.5 * v) / Math.max(v, 5) + 0.35;
-          const tClear = need <= 0 ? 0 : tau * Math.log(E / Math.max(0.15, E - need)) + 0.25;
+          const tClear = need <= 0 ? 0 : tau * dlog(E / Math.max(0.15, E - need)) + 0.25;
           const vPass = tClear <= 0 ? Infinity : c.v + Math.max(0, gap - 3) / (tClear * (o.passSafety ?? 1.3));
           if (vPass > vNow) vNow = vPass;
         }

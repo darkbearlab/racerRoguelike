@@ -6,6 +6,7 @@
 //
 // 重點：psi 每步扣掉「曲率 × 前進速度」，所以彎道不打方向盤就會衝向外側護欄；
 // s 的推進依 d 修正，內線比較短。
+import { datan2, dcos, dhypot, dsin } from '../core/dmath.js';
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -79,7 +80,7 @@ export function stepCar(st, input, cfg, road, dt, events) {
   const gripCap = ((drift ? cfg.driftYawMul : 1) * cfg.latAccelMax) / Math.max(vAbs, 6);
   let r = st.steer * Math.min(yawMax, gripCap) * dir;
   // 自動回正：車頭轉向速度方向（類似後傾角效應）
-  const beta = Math.atan2(st.vl, Math.max(vAbs, 1));
+  const beta = datan2(st.vl, Math.max(vAbs, 1));
   r -= beta * cfg.alignRate * (drift ? 0.3 : 1) * (1 - 0.6 * Math.abs(st.steer)) * dir;
   // 貼牆時方向盤不能再把車頭往牆裡轉（否則會反覆撞牆被扣到停）
   if (st.wallContact > 0 && r * st.wallSide < 0) r = 0;
@@ -87,7 +88,7 @@ export function stepCar(st, input, cfg, road, dt, events) {
 
   // ── 縱向
   let drive = 0;
-  if (throttle > 0 && st.vf < vEng) drive += throttle * cfg.power * (1 - (st.vf / vEng) ** 2);
+  if (throttle > 0 && st.vf < vEng) drive += throttle * cfg.power * (1 - (st.vf / vEng) * (st.vf / vEng));
   if (st.boostAccel > 0) drive += st.boostAccel; // 短暫加速（成長：甩尾加速）
   let resist = cfg.dragCoef * st.dragMul * st.vf * st.vf + cfg.rollResist;
   if (throttle === 0) resist += cfg.engineBrake;
@@ -115,7 +116,7 @@ export function stepCar(st, input, cfg, road, dt, events) {
   // ── 轉到道路座標並積分
   let psi = st.psi;
   const kappa = road.curvature(st.s);
-  let cp = Math.cos(psi), sp = Math.sin(psi);
+  let cp = dcos(psi), sp = dsin(psi);
   let ut = vf * cp + vl * sp;   // 沿切線
   let ud = -vf * sp + vl * cp;  // 沿右向
   const sdot = ut / Math.max(0.3, 1 + kappa * st.d);
@@ -126,7 +127,7 @@ export function stepCar(st, input, cfg, road, dt, events) {
 
   // ── 護欄：限制 d 的範圍，依撞擊角度扣速度，車頭轉回沿路方向
   //    左右寬度逐點查詢（匯入路段左側會多一個車道）
-  const body = cfg.halfWidth + 0.5 * Math.abs(Math.sin(psi));
+  const body = cfg.halfWidth + 0.5 * Math.abs(dsin(psi));
   const sNext = st.s + sdot * dt;
   const limR = road.widthRight(sNext) - body;
   const limL = road.widthLeft(sNext) - body;
@@ -139,7 +140,7 @@ export function stepCar(st, input, cfg, road, dt, events) {
     st.wallSide = side;
     if (d * side > lim) d = side * lim;
     const vout = ud * side;
-    const speed = Math.hypot(ut, ud);
+    const speed = dhypot(ut, ud);
     if (vout > 0) {
       // 撞擊只在剛接觸時扣一次；持續貼牆只算摩擦，不會被一路扣到停
       if (vout > 1.0 && !wasContact) {
@@ -159,13 +160,13 @@ export function stepCar(st, input, cfg, road, dt, events) {
     ut = Math.abs(ut) <= scrape ? ut : ut - Math.sign(ut) * scrape;
     // 車頭若朝向牆，轉回沿路方向（逆向時轉回逆向）
     // 貼牆期間，方向盤不能再把車頭往牆裡轉
-    if (wasContact && -Math.sin(psi) * side > -Math.sin(st.psi) * side) psi = st.psi;
-    const intoWall = -Math.sin(psi) * side > 0;
+    if (wasContact && -dsin(psi) * side > -dsin(st.psi) * side) psi = st.psi;
+    const intoWall = -dsin(psi) * side > 0;
     if (intoWall) {
       const tgt = Math.abs(psi) > Math.PI / 2 ? Math.sign(psi) * Math.PI : 0;
       psi += (tgt - psi) * Math.min(1, 8 * dt);
     }
-    cp = Math.cos(psi); sp = Math.sin(psi);
+    cp = dcos(psi); sp = dsin(psi);
     vf = ut * cp - ud * sp;
     vl = ut * sp + ud * cp;
     st.wallContact = 0.12;
@@ -183,7 +184,7 @@ export function stepCar(st, input, cfg, road, dt, events) {
         if (events) events.emit('wallHit', { loss: cfg.wallLossGraze, speedLoss: Math.abs(ut) * cfg.wallLossGraze, side: -gs, sinA: 0.1 });
       }
       ud = gs * 0.8;
-      cp = Math.cos(psi); sp = Math.sin(psi);
+      cp = dcos(psi); sp = dsin(psi);
       vf = ut * cp - ud * sp;
       vl = ut * sp + ud * cp;
     }
@@ -204,6 +205,6 @@ export function stepCar(st, input, cfg, road, dt, events) {
   st.psi = psi;
   st.vf = vf;
   st.vl = vl;
-  st.speed = Math.hypot(vf, vl);
+  st.speed = dhypot(vf, vl);
   return st;
 }

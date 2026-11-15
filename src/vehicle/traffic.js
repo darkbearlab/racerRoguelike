@@ -3,6 +3,7 @@
 //
 // 交流道：分歧點之後有主線與 alt 兩條分支。車過分歧點時依所在的那一側決定走哪條；
 // 走 alt 的車（onAlt）只跟同一條分支上的車互動，等 alt 被回收時一起消失。
+import { datan2 } from '../core/dmath.js';
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const smooth = (a) => a * a * (3 - 2 * a);
 
@@ -323,7 +324,7 @@ export function createTraffic(road, rng, cfg) {
       // 被賽車擠開的位移：疊在車道位置上，約一秒內回正
       if (c.push) { c.push *= Math.max(0, 1 - 2.2 * dt); if (Math.abs(c.push) < 0.01) c.push = 0; c.d += c.push; }
       // 車頭略轉向橫移方向（psi 左為正、d 右為正）
-      const yawT = c.v > 1 ? clamp(Math.atan2(-(c.d - dPrev) / dt, c.v), -0.2, 0.2) : 0;
+      const yawT = c.v > 1 ? clamp(datan2(-(c.d - dPrev) / dt, c.v), -0.2, 0.2) : 0;
       c.yaw += (yawT - c.yaw) * Math.min(1, 10 * dt);
     }
     api.count = active;

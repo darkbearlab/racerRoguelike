@@ -32,6 +32,7 @@ import { createTrafficMesh } from './render/trafficMesh.js';
 import { createSparks } from './render/sparks.js';
 import { createCameraRig, VIEW_NAMES } from './camera/cameraRig.js';
 import { createHud, virtualRpm } from './ui/hud.js';
+import { createRecorder } from './core/replay.js';
 import { createChoiceUi } from './ui/choice.js';
 import { createGameAudio } from './audio/gameAudio.js';
 
@@ -62,7 +63,10 @@ const hud = createHud(DEBUG);
 // 事件要在建立 session 之前掛好：開局就會插入第一個交流道
 const boot = [];
 events.on('jctPlaced', (e) => boot.push(e));
-const session = createSession({ seed, carCfg, rivalBase: carsJson.rivalBase, zone, zones: zonesJson, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, events, bossRush: BOSS_RUSH });
+const sessionArgs = { seed, carCfg, rivalBase: carsJson.rivalBase, zone, zones: zonesJson, trafficCfg, duelCfg, rivals, runCfg, upgradeCfg, bossRush: BOSS_RUSH };
+// 重播紀錄（給事後分析用）：開局設定的快照＋每一步的輸入，可以在沒有畫面的環境逐步重跑出一樣的結果
+const recorder = createRecorder(sessionArgs, { commit: typeof __COMMIT__ === 'string' ? __COMMIT__ : '', startedAt: new Date().toISOString(), query: location.search, agent: navigator.userAgent });
+const session = createSession({ ...sessionArgs, events });
 const { road, traffic, state, rival, duel, clock, flow, playerCfg, upgrades, menus } = session;
 const choiceUi = createChoiceUi();
 const audio = createGameAudio({ events, state, traffic, rival });
@@ -315,17 +319,19 @@ function autoOpts() {
   } else approachMem = 0;
   return { traffic: session.obsForPlayer, mem: aiMem, dt: 1 / 60, line: !approaching, caution: 0.85, margin: 1.25, preferD };
 }
+// 會影響模擬的操作一律經過 recorder，重播才對得上
+const menuInput = (d) => { recorder.call('menu', d); menus.input(d); };
 const playerInput = () => (AUTOPILOT ? autopilot(state, playerCfg, road, autoOpts(), aiInput) : input.held);
 
 // 自動駕駛時也自動操作選單：三選一拿第一張；商店買得起就買，然後離開
 function autoMenu() {
   const m = menus.current;
   if (!m || m.lock > 0) return;
-  if (m.kind === 'choice' && m.shop) { const k = m.prices.findIndex((p) => session.run.bounty >= p); menus.input(k < 0 ? 'down' : ['left', 'up', 'right'][k]); return; }
-  if (m.kind === 'choice') { menus.input('left'); return; }
+  if (m.kind === 'choice' && m.shop) { const k = m.prices.findIndex((p) => session.run.bounty >= p); menuInput(k < 0 ? 'down' : ['left', 'up', 'right'][k]); return; }
+  if (m.kind === 'choice') { menuInput('left'); return; }
   const i = m.stock.findIndex((it) => !it.sold && session.run.bounty >= it.price && upgrades.canTake(it.def));
-  if (i < 0) { menus.input('down'); return; }
-  if (m.cursor !== i) menus.input('right'); else menus.input('up');
+  if (i < 0) { menuInput('down'); return; }
+  if (m.cursor !== i) menuInput('right'); else menuInput('up');
 }
 
 // ── 標題畫面：按開始之前世界靜止，鏡頭繞著車子轉
@@ -476,9 +482,8 @@ function confirmPick() {
   if (!picking) return;
   closePick();
   applyStarter();
-  session.recompute();
-  session.resetStart();
-  session.drawBuffs();
+  recorder.call('carCfg', carCfg);
+  for (const name of ['recompute', 'resetStart', 'drawBuffs']) { recorder.call(name); session[name](); }
   startRun();
 }
 // 兩種模式的賽道一開始就不一樣（連戰沒有交流道），所以換模式要重新載入；載入後直接進選車
@@ -494,7 +499,7 @@ btnStart.classList.toggle('sel', !BOSS_RUSH); btnBoss.classList.toggle('sel', BO
 if (BOSS_RUSH) document.querySelector('#title h2').textContent = 'BOSS RUSH';
 btnStart.addEventListener('click', () => pickMode(false));
 btnBoss.addEventListener('click', () => pickMode(true));
-if (AUTOPILOT) session.drawBuffs();
+if (AUTOPILOT) { recorder.call('drawBuffs'); session.drawBuffs(); }
 if (params.get('pick') === '1' && !AUTOPILOT) {
   const u = new URL(location.href); u.searchParams.delete('pick'); history.replaceState(null, '', u.href);
   setTimeout(openPick, 0);
@@ -519,7 +524,7 @@ hud.title(!started);
 function step(dt) {
   if (paused || !started) return;
   if (AUTOPILOT) autoMenu();
-  session.step(dt, playerInput());
+  recorder.step(session, dt, playerInput());
 }
 
 // ── 姿態：道路座標 → 世界座標
@@ -558,7 +563,7 @@ function render(alpha, dt) {
     car.setView(v);
     hud.toast(VIEW_NAMES[v]);
   }
-  if (edges.menu && menus.current && !paused) menus.input(edges.menu);
+  if (edges.menu && menus.current && !paused) menuInput(edges.menu);
   if (edges.flash) flash = 0.18;   // 閃燈只是燈光效果；對決是靠近對手自動開始
   if (flash > 0) flash -= dt;
 
@@ -753,8 +758,37 @@ const loop = createLoop({ step, render });
 loop.start();
 if (AUTOPILOT) hud.toast('自動駕駛', 2.5);
 
+// ── 重播紀錄存檔。開發伺服器：自動寫進專案的 replays/ 資料夾（每 15 秒、結束時、關掉分頁時，同一局蓋同一個檔）。
+//    其他環境（GitHub Pages）：按 F9 下載成檔案
+const replayName = `replay-${recorder.data.meta.startedAt.replace(/[-:]/g, '').slice(0, 15)}-${seed}`;
+let replaySaved = 0;
+function saveReplay(manual) {
+  if (recorder.data.steps === replaySaved && !manual) return;
+  replaySaved = recorder.data.steps;
+  const body = JSON.stringify(recorder.data);
+  if (import.meta.env.DEV) {
+    fetch(`/__replay?name=${replayName}`, { method: 'POST', body, keepalive: body.length < 60000 })
+      .then((r) => { if (manual) hud.toast(r.ok ? `重播已存檔　replays/${replayName}.json` : '重播存檔失敗', 2.4); })
+      .catch(() => { if (manual) hud.toast('重播存檔失敗', 2); });
+  } else if (manual) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([body], { type: 'application/json' }));
+    a.download = `${replayName}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    hud.toast('重播已下載', 2);
+  }
+}
+if (import.meta.env.DEV) {
+  setInterval(() => { if (started && !paused) saveReplay(false); }, 15000);
+  events.on('runOver', () => saveReplay(false));
+  addEventListener('pagehide', () => saveReplay(false));
+}
+addEventListener('keydown', (e) => { if (e.code === 'F9') { e.preventDefault(); saveReplay(true); } });
+
 // 除錯與自動化測試用
 window.__game = {
+  recorder, saveReplay,
   post, gfx, applyGfx, streamer, scene, trails, reflection, audio, starters, openPick, showPick, confirmPick,
   models: modelsJson,
   lyrics, session, state, road, carCfg, playerCfg, upgrades, menus, camCfg, trafficCfg, duelCfg, runCfg, clock, flow, rig, loop, renderer, car, rivalCar, traffic, streamer, duel, rival,
@@ -763,7 +797,7 @@ window.__game = {
     const n = Math.round(sec * 60);
     for (let i = 0; i < n; i++) {
       if (!inp) autoMenu();
-      session.step(1 / 60, inp || autopilot(state, playerCfg, road, autoOpts(), aiInput));
+      recorder.step(session, 1 / 60, inp || autopilot(state, playerCfg, road, autoOpts(), aiInput));
       streamer.update(state.s, null);
       if (i % 2 === 0) { computePose(state.s, state.d, state.psi, pose); rig.update(pose, { kmh: state.vf * 3.6, vFrac: 0, steer: state.steer, lookBack: false }, 1 / 30); }
       if (until && until()) break;
@@ -779,7 +813,7 @@ window.__game = {
     for (let i = 0; i < n; i++) {
       const f0 = performance.now();
       autoMenu();
-      session.step(1 / 60, autopilot(state, playerCfg, road, autoOpts(), aiInput));
+      recorder.step(session, 1 / 60, autopilot(state, playerCfg, road, autoOpts(), aiInput));
       render(1, 1 / 60);
       gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       worst = Math.max(worst, performance.now() - f0);

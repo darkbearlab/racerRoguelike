@@ -4,6 +4,7 @@
  * 兩台賽車（玩家與對手）互撞：質量相同，前後向交換部分速度，側向各推開一半。
  * 回傳是否有接觸。
  */
+import { dcos, dhypot, dsin } from '../core/dmath.js';
 export function collidePair(a, cfgA, b, cfgB, road, events) {
   const ds = b.s - a.s;
   const penS = cfgA.halfLength + cfgB.halfLength - Math.abs(ds);
@@ -13,12 +14,12 @@ export function collidePair(a, cfgA, b, cfgB, road, events) {
   if (penD <= 0) return false;
 
   const toRoad = (st) => {
-    const c = Math.cos(st.psi), s = Math.sin(st.psi);
+    const c = dcos(st.psi), s = dsin(st.psi);
     return [st.vf * c + st.vl * s, -st.vf * s + st.vl * c];
   };
   const fromRoad = (st, ut, ud) => {
-    const c = Math.cos(st.psi), s = Math.sin(st.psi);
-    st.vf = ut * c - ud * s; st.vl = ut * s + ud * c; st.speed = Math.hypot(st.vf, st.vl);
+    const c = dcos(st.psi), s = dsin(st.psi);
+    st.vf = ut * c - ud * s; st.vl = ut * s + ud * c; st.speed = dhypot(st.vf, st.vl);
   };
   let [ua, da] = toRoad(a);
   let [ub, db] = toRoad(b);
@@ -69,10 +70,10 @@ export function collidePlayerTraffic(st, carCfg, traffic, tcfg, road, dt, events
     const penD = hw + c.wid / 2 - Math.abs(dd);
     if (penD <= 0) continue;
 
-    const cp = Math.cos(st.psi), sp = Math.sin(st.psi);
+    const cp = dcos(st.psi), sp = dsin(st.psi);
     let ut = st.vf * cp + st.vl * sp;
     let ud = -st.vf * sp + st.vl * cp;
-    const before = Math.hypot(ut, ud);
+    const before = dhypot(ut, ud);
 
     const rel = ut - c.v;
     const closing = (ds > 0 && rel > 0) || (ds < 0 && rel < 0);
@@ -108,15 +109,15 @@ export function collidePlayerTraffic(st, carCfg, traffic, tcfg, road, dt, events
     const maxR = road.widthRight(st.s) - hw, maxL = road.widthLeft(st.s) - hw;
     if (st.d > maxR) st.d = maxR; else if (st.d < -maxL) st.d = -maxL;
 
-    const cp2 = Math.cos(st.psi), sp2 = Math.sin(st.psi);
+    const cp2 = dcos(st.psi), sp2 = dsin(st.psi);
     st.vf = ut * cp2 - ud * sp2;
     st.vl = ut * sp2 + ud * cp2;
-    st.speed = Math.hypot(st.vf, st.vl);
+    st.speed = dhypot(st.vf, st.vl);
     hits++;
     // 同一次接觸只計一次、只發一次事件
     if (fresh) {
       st.carHits = (st.carHits || 0) + 1;
-      if (events) events.emit('carHit', { speedLoss: Math.max(0, before - Math.hypot(ut, ud)), side: dd > 0 ? 1 : -1, longitudinal });
+      if (events) events.emit('carHit', { speedLoss: Math.max(0, before - dhypot(ut, ud)), side: dd > 0 ? 1 : -1, longitudinal });
     }
     st.carHitCool = 0.35;
   }
@@ -128,7 +129,7 @@ export function collidePlayerTraffic(st, carCfg, traffic, tcfg, road, dt, events
       const penS = hl + c.len / 2 - Math.abs(ds);
       if (penS <= 0 || hw + c.wid / 2 - Math.abs(c.d - st.d) <= 0.08) continue;
       if (ds > -1) {
-        if (st.vf > c.v) { st.vf = Math.max(c.v, st.vf - 30 * dt); st.speed = Math.hypot(st.vf, st.vl); }
+        if (st.vf > c.v) { st.vf = Math.max(c.v, st.vf - 30 * dt); st.speed = dhypot(st.vf, st.vl); }
         st.s -= Math.min(penS, 9 * dt);
       }
     }

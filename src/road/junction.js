@@ -5,6 +5,7 @@
 //   分歧後 300 m：兩條分支各自彎開，並從 2 車道補回 3 車道
 //
 // 兩條分支共用分歧點那個 node（位置與朝向相同），之後曲率相反所以鏡像分開。
+import { dsin } from '../core/dmath.js';
 import { DS } from './spline.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -54,7 +55,7 @@ export function buildJunction(road, branchDeg = 24) {
   let dTheta = 0, dev = 0; // 分支相對分歧點切線的轉角與橫向偏離
   for (let i = 0; i < nB; i++) {
     const k = (ks[i] * ang) / sum;
-    dev += Math.sin(dTheta + k * DS * 0.5) * DS;
+    dev += dsin(dTheta + k * DS * 0.5) * DS;
     dTheta += k * DS;
     const t = (i + 1) * DS;
     const u = smooth(clamp(t / 200, 0, 1));

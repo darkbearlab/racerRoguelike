@@ -7,6 +7,7 @@
 //   'run'   正式流程：交流道選路 → 節點（對手／強敵／PA）→ 下一個交流道，受天亮時鐘限制
 //   'loop'  只有對手一位接一位出現（M3 的行為，測試用）
 //   'free'  沒有對手也沒有交流道（測試用）
+import { dcos } from '../core/dmath.js';
 import { createRng } from '../core/rng.js';
 import { createRoad } from '../road/spline.js';
 import { createGenerator } from '../road/generator.js';
@@ -344,7 +345,7 @@ export function createSession({ seed, carCfg, rivalBase, zone, zones, trafficCfg
       oncoming.update(dt, playerProxy);
       // 逆向：車頭朝後（倒車時車頭還是朝前，不算；甩尾轉過頭的一瞬間也不算），持續半秒才警告。
       // 停著也算：往回開到道路盡頭會被擋住，這時更需要提示掉頭
-      const back = Math.cos(state.psi) < -0.3 && state.vf > -0.5;
+      const back = dcos(state.psi) < -0.3 && state.vf > -0.5;
       S.wrongT = back ? S.wrongT + dt : 0;
       const ww = S.wrongT > 0.5;
       if (ww !== S.wrongWay) { S.wrongWay = ww; emit('wrongWay', { on: ww }); }

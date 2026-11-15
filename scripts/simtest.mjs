@@ -651,5 +651,39 @@ section('護欄：貼牆過彎不能比正常過彎快');
   check('直線輕擦護欄只掉一點車速', st.wallHits >= 1 && st.vf > 50 * 0.88 && st.vf < 50 * 0.97, `180 → ${(st.vf * 3.6).toFixed(0)} km/h，碰 ${st.wallHits} 次`);
 }
 
+section('重播紀錄：同樣的輸入逐步重現');
+{
+  const { createRecorder, runReplay, checksum } = await import('../src/core/replay.js');
+  const zones = load('../src/config/zones.json'), cars = load('../src/config/cars.json');
+  const args = { seed: 9001, carCfg: { ...cars.player }, rivalBase: cars.rivalBase, zone: zones.default, zones, trafficCfg: structuredClone(tcfg), duelCfg: structuredClone(dcfg), rivals: structuredClone(allRivals), runCfg: structuredClone(rcfg), upgradeCfg: load('../src/config/upgrades.json'), bossRush: false };
+  const rec = createRecorder(args, {});
+  const S = createSession({ ...args });
+  // 和遊戲一樣：選車後才把車輛數值套上去
+  Object.assign(args.carCfg, cars.player, cars.starters[0].car, { model: cars.starters[0].model });
+  rec.call('carCfg', args.carCfg);
+  for (const name of ['recompute', 'resetStart', 'drawBuffs']) { rec.call(name); S[name](); }
+  const inp = {}, mem = createAiMemory(), rng = createRng(7);
+  const trace = [];
+  for (let i = 0; i < 6 * 60 * 60 && !S.over; i++) {
+    const m = S.menus?.current;
+    if (m && m.lock <= 0) { const d = rng.pick(['left', 'right', 'up']); rec.call('menu', d); S.menus.input(d); }
+    autopilot(S.state, S.playerCfg, S.road, { traffic: S.obsForPlayer, mem, dt: DT }, inp);
+    if (i % 400 < 30) inp.steer = rng.pick([-1, 1]);   // 偶爾亂打方向盤，讓它撞一撞
+    rec.step(S, DT, inp);
+    if (i % 60 === 0) trace.push(S.state.s, S.rival.st.s, S.traffic.cars[3].s, S.oncoming.cars[2].s);
+  }
+  const data = JSON.parse(JSON.stringify(rec.data));   // 走一次存檔格式
+  const trace2 = [];
+  const res = runReplay(data, { createSession, onStep(R, n) { if (n % 60 === 0) trace2.push(R.state.s, R.rival.st.s, R.traffic.cars[3].s, R.oncoming.cars[2].s); } });
+  check('重跑後每秒的校驗碼全部相同', res.firstDiff < 0 && res.checked === data.sums.length && res.checked > 300, `${res.checked} 個檢查點，${data.inputs.length} 筆輸入，${data.calls.length} 筆操作`);
+  check('玩家、對手、車流、對向車的位置逐秒完全相同', trace.length === trace2.length && trace.every((v, i) => v === trace2[i]), `${trace.length} 個數值`);
+  check('結束時的狀態相同', checksum(res.S) === checksum(S) && res.S.run.bounty === S.run.bounty && res.S.run.defeats === S.run.defeats, `擊敗 ${S.run.defeats}，賞金 ${S.run.bounty}`);
+  // 改一筆輸入就應該對不上（確認校驗碼真的有在比）
+  const bad = structuredClone(data);
+  bad.inputs[Math.floor(bad.inputs.length / 3)][3] = 1;
+  const res2 = runReplay(bad, { createSession });
+  check('輸入被改過會被校驗碼抓到', res2.firstDiff > 0, `第 ${(res2.firstDiff / 60).toFixed(0)} 秒開始不同`);
+}
+
 console.log(failed ? `\n${failed} 項失敗` : '\n全部通過');
 process.exit(failed ? 1 : 0);

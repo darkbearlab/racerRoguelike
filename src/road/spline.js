@@ -10,6 +10,7 @@
 // 交流道分歧：分歧點之後有兩條分支，各自是一個 Road 物件（主線 + alt），
 // 兩者共用同一套 s 編號。玩家選了另一條時 swapWith() 交換兩者的內容，
 // 所以「主線」這個物件永遠是玩家所在的路，其他模組不必換參考。
+import { dcos, dhypot, dsin } from '../core/dmath.js';
 export const DS = 2;
 const CAP = 2048;
 const MASK = CAP - 1;
@@ -39,7 +40,7 @@ export function createRoad(def) {
   let B = newBuffer();
   const elev = (s) => {
     let h = 0;
-    for (const hl of hills) h += hl.amp * Math.sin((Math.PI * 2 * s) / hl.wavelength + hl.phase);
+    for (const hl of hills) h += hl.amp * dsin((Math.PI * 2 * s) / hl.wavelength + hl.phase);
     return h;
   };
   B.y[0] = elev(0); B.wl[0] = halfWidth; B.wr[0] = halfWidth;
@@ -78,8 +79,8 @@ export function createRoad(def) {
     push(k, o) {
       const a = B.iMax & MASK, b = (B.iMax + 1) & MASK;
       const mid = B.theta[a] + k * DS * 0.5;
-      B.x[b] = B.x[a] + Math.sin(mid) * DS;
-      B.z[b] = B.z[a] + Math.cos(mid) * DS;
+      B.x[b] = B.x[a] + dsin(mid) * DS;
+      B.z[b] = B.z[a] + dcos(mid) * DS;
       B.theta[b] = B.theta[a] + k * DS;
       B.y[b] = elev((B.iMax + 1) * DS);
       B.kappa[a] = (B.lastK + k) / 2;
@@ -234,13 +235,13 @@ export function createRoad(def) {
     /** 世界座標框架：p 位置、t 前進方向、r 右、u 上（皆為長度 3 陣列） */
     frame(s, out) {
       const sm = road.sample(s, _tmp);
-      const st = Math.sin(sm.theta);
-      const ct = Math.cos(sm.theta);
-      const inv = 1 / Math.hypot(1, sm.slope);
+      const st = dsin(sm.theta);
+      const ct = dcos(sm.theta);
+      const inv = 1 / dhypot(1, sm.slope);
       const tx = st * inv, ty = sm.slope * inv, tz = ct * inv;
       const rx = -ct, rz = st; // 無傾角的右向量
       const nx = -rz * ty, ny = rz * tx - rx * tz, nz = rx * ty; // n = rflat × t
-      const cb = Math.cos(sm.bank), sb = Math.sin(sm.bank);
+      const cb = dcos(sm.bank), sb = dsin(sm.bank);
       const Rx = rx * cb + nx * sb, Ry = ny * sb, Rz = rz * cb + nz * sb;
       out.p[0] = sm.x; out.p[1] = sm.y; out.p[2] = sm.z;
       out.t[0] = tx; out.t[1] = ty; out.t[2] = tz;
