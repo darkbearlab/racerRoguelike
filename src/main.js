@@ -341,6 +341,7 @@ try {
   if (typeof saved.sfx === 'number') audio.sfxVolume = saved.sfx;
   if (typeof saved.lyrics === 'boolean') lyrics.enabled = saved.lyrics;
   if (typeof saved.lyricsOff === 'number') lyrics.offset = saved.lyricsOff;
+  if (Array.isArray(saved.bgmOff)) audio.tracksOff = saved.bgmOff;
 } catch { /* 讀不到就用預設值 */ }
 optMirror.checked = !!camCfg.mirror;
 optGfx.checked = gfx.quality !== 'low';
@@ -363,7 +364,7 @@ const saveSettings = () => {
   lyrics.enabled = optLyrics.checked;
   lyrics.offset = Number(optLyricsOff.value) / 10; optLyricsOffV.textContent = lyrics.offset.toFixed(1);
   applyGfx();
-  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume, lyrics: lyrics.enabled, lyricsOff: lyrics.offset })); } catch { /* 存不了就算了 */ }
+  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume, lyrics: lyrics.enabled, lyricsOff: lyrics.offset, bgmOff: audio.tracksOff })); } catch { /* 存不了就算了 */ }
 };
 optMirror.addEventListener('change', saveSettings);
 optGfx.addEventListener('change', saveSettings);
@@ -374,6 +375,39 @@ optMusic.addEventListener('input', saveSettings);
 optSfx.addEventListener('input', saveSettings);
 optLyrics.addEventListener('change', saveSettings);
 optLyricsOff.addEventListener('input', saveSettings);
+// 歌單：勾選要進隨機輪播的歌；有整理好歌詞的標「詞」；▶ = 這一局開場先播這首（測歌詞用）
+{
+  const rows = document.getElementById('plRows'), count = document.getElementById('plCount');
+  const hasLrc = new Set(BGM_LYRICS), base = (n) => n.replace(/\.[^.]+$/, '');
+  const sorted = audio.tracks.slice().sort((a, b) => (hasLrc.has(base(b)) - hasLrc.has(base(a))) || a.localeCompare(b));
+  const refresh = () => {
+    const on = audio.tracks.filter((n) => audio.trackOn(n)).length;
+    count.textContent = `${on} / ${audio.tracks.length} 首　有歌詞 ${audio.tracks.filter((n) => hasLrc.has(base(n))).length} 首`;
+    for (const r of rows.children) { r.firstChild.checked = audio.trackOn(r.dataset.n); r.classList.toggle('first', audio.firstTrack === r.dataset.n); }
+  };
+  for (const n of sorted) {
+    const row = document.createElement('label');
+    row.className = 'plrow'; row.dataset.n = n;
+    const cb = document.createElement('input'); cb.type = 'checkbox';
+    cb.addEventListener('change', () => { audio.setTrack(n, cb.checked); saveSettings(); refresh(); });
+    const name = document.createElement('span'); name.className = 'pn'; name.textContent = base(n);
+    row.append(cb, name);
+    if (hasLrc.has(base(n))) { const t = document.createElement('i'); t.className = 'lrc'; t.textContent = '詞'; row.append(t); }
+    const pf = document.createElement('button'); pf.type = 'button'; pf.className = 'pf'; pf.textContent = '▶ 開場播'; pf.tabIndex = -1;
+    pf.addEventListener('click', (e) => { e.preventDefault(); audio.firstTrack = audio.firstTrack === n ? '' : n; pf.blur(); refresh(); });
+    row.append(pf);
+    rows.append(row);
+  }
+  for (const b of document.querySelectorAll('#plist [data-pl]')) {
+    b.tabIndex = -1;
+    b.addEventListener('click', () => {
+      const mode = b.dataset.pl;
+      for (const n of audio.tracks) audio.setTrack(n, mode === 'all' || (mode === 'lrc' && hasLrc.has(base(n))));
+      b.blur(); saveSettings(); refresh();
+    });
+  }
+  refresh();
+}
 function startRun() {
   if (started) return;
   started = true;

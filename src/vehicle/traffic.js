@@ -14,6 +14,7 @@ export function createTraffic(road, rng, cfg) {
     cars.push({
       id: i, active: false, onAlt: false, type: 'sedan', len: 4.5, wid: 1.8, height: 1.4,
       s: 0, d: 0, ps: 0, pd: 0, v: 0, cruise: 0, lane: 0, toLane: 0, fromLane: 0, toD: 0,
+      push: 0,         // 被賽車擠開的橫向位移（碰撞時設定，之後慢慢回到車道中央）
       changeT: 0,      // > 0：正在變換車道（剩餘秒數）
       blink: 0,        // −1 左、+1 右
       blinkTime: 0,    // 打燈後還要等多久才開始切
@@ -90,7 +91,7 @@ export function createTraffic(road, rng, cfg) {
     c.cruise = rng.range(t.kmhMin, t.kmhMax) / 3.6;
     c.v = c.cruise;
     c.changeT = 0; c.blink = 0; c.blinkTime = 0; c.yaw = 0; c.braking = false;
-    c.merging = false; c.yield = false;
+    c.merging = false; c.yield = false; c.push = 0;
     c.timer = rng.range(cfg.laneChangeEveryMin, cfg.laneChangeEveryMax);
     c.hue = rng.next();
     api.spawned++;
@@ -317,6 +318,8 @@ export function createTraffic(road, rng, cfg) {
           }
         }
       }
+      // 被賽車擠開的位移：疊在車道位置上，約一秒內回正
+      if (c.push) { c.push *= Math.max(0, 1 - 2.2 * dt); if (Math.abs(c.push) < 0.01) c.push = 0; c.d += c.push; }
       // 車頭略轉向橫移方向（psi 左為正、d 右為正）
       const yawT = c.v > 1 ? clamp(Math.atan2(-(c.d - dPrev) / dt, c.v), -0.2, 0.2) : 0;
       c.yaw += (yawT - c.yaw) * Math.min(1, 10 * dt);

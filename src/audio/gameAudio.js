@@ -54,11 +54,16 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
   const stats = { hits: 0, passes: 0, shifts: 0, rpm: 0, gear: 1, loaded: 0, scrape: 0, track: '', tracks: 0 };
 
   // ── 背景音樂：用 <audio> 串流播放（不整首解碼進記憶體），各自接一個增益節點做淡入淡出
-  let musicVol = 0.6, bgmBus = null, cur = null, order = [], musicCool = 0;
+  let musicVol = 0.6, bgmBus = null, cur = null, order = [], musicCool = 0, first = '';
   const decks = new Set();
+  const off = new Set();   // 設定裡取消勾選的歌
+  const pool = () => BGM.filter((n) => !off.has(n));
   function nextName() {
+    if (first) { const n = first; first = ''; if (BGM.includes(n)) return n; }
+    order = order.filter((n) => !off.has(n));
     if (!order.length) {
-      order = BGM.slice();
+      order = pool();
+      if (!order.length) return null;
       for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
       if (order[0] === stats.track && order.length > 1) order.push(order.shift());   // 洗牌後不要連播同一首
     }
@@ -73,6 +78,7 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
   }
   function startTrack(fade) {
     const name = nextName();
+    if (!name) { cur = null; return; }
     const el = new Audio(BGM_BASE + encodeURI(name));
     el.preload = 'auto';
     el.preservesPitch = false; el.mozPreservesPitch = false; el.webkitPreservesPitch = false;   // 變慢時音高跟著掉，像唱盤被按住
@@ -88,6 +94,7 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
   }
   function tickMusic(dt) {
     if (!bgmBus || !BGM.length) return;
+    if (!cur && !first && !pool().length) return;   // 歌單全部取消勾選：不放音樂
     for (const d of decks) if (ctx.currentTime > d.killAt || (d.failed && d !== cur)) { d.el.pause(); d.src.disconnect(); d.el.removeAttribute('src'); decks.delete(d); }
     musicCool -= dt;
     if (!cur || cur.failed) {
@@ -197,7 +204,15 @@ export function createGameAudio({ events, state, traffic, rival, engine = {} }) 
       o.connect(og); og.connect(sfxBus); o.start(t + 0.03); o.stop(t + 0.14);
     },
     /** 跳到下一首：目前這首很快淡掉，下一首直接開始 */
-    nextTrack() { if (bgmBus && BGM.length > 1 && cur && !suspended) { fadeOut(cur, 0.6); startTrack(0.3); } },
+    nextTrack() { if (bgmBus && pool().length > 1 && cur && !suspended) { fadeOut(cur, 0.6); startTrack(0.3); } },
+    /** 歌單：全部的歌、哪些被取消勾選、開局先播哪一首 */
+    get tracks() { return BGM; },
+    get tracksOff() { return [...off]; },
+    set tracksOff(list) { off.clear(); for (const n of list || []) if (BGM.includes(n)) off.add(n); },
+    setTrack(name, on) { if (on) off.delete(name); else off.add(name); },
+    trackOn(name) { return !off.has(name); },
+    get firstTrack() { return first; },
+    set firstTrack(n) { first = n || ''; },
 
     /** 一定要在使用者操作（點擊、按鍵）的處理函式裡呼叫 */
     start() {

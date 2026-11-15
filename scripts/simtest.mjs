@@ -151,6 +151,36 @@ section('亂數輸入與碰撞');
   check('追撞大幅減速', hit && s2.vf * 3.6 < 140, `250 → ${(s2.vf * 3.6).toFixed(0)} km/h，前車被推到 ${(c.v * 3.6).toFixed(0)} km/h`);
 }
 
+section('鑽車縫：兩台並排、旁邊的車切過來');
+{
+  // 回傳 { minStep（單步 s 的最小變化，負的就是被往後搬）, v（結束時車速）, rel（結束時相對那台車的位置）}
+  const run = (setup, sec = 3) => {
+    const w = world(3);
+    const tr = createTraffic(w.road, createRng(5), { ...tcfg, densityPerKm: 0 });
+    const s0 = 400;
+    const a = tr.spawnCar(s0, 1, 90), b = tr.spawnCar(s0 + 1.5, 2, 90);
+    const st = createCarState({ s: s0 - 30, d: (a.d + b.d) / 2, vf: 60 });
+    let minStep = Infinity, hit = false;
+    for (let i = 0; i < sec * 60; i++) {
+      const ps = st.s;
+      // 方向不是這裡要測的：每一步把車擺回兩台車中間（偏 15 cm，縫只比車寬多一點點）、車頭對正，只看碰撞怎麼處理
+      if (!hit) { st.d = (a.d + b.d) / 2 + 0.15; st.psi = 0; st.vl = 0; }
+      stepCar(st, { throttle: 1, steer: 0 }, cfg, w.road, DT, null);
+      tr.update(DT, { s: st.s, d: st.d, v: st.vf });
+      if (setup) setup(i, st, a, b);
+      if (collidePlayerTraffic(st, cfg, tr, tcfg, w.road, DT, null)) hit = true;
+      if (st.s - ps < minStep) minStep = st.s - ps;
+    }
+    return { minStep, v: st.vf, rel: st.s - a.s, gap: Math.abs(a.d - b.d) };
+  };
+  const thread = run(null);
+  check('從兩台並排的車中間鑽過去：不會被夾住', thread.rel > 40 && thread.v > 45 && thread.minStep > 0.3,
+    `3 秒後領先 ${thread.rel.toFixed(0)} m、${(thread.v * 3.6).toFixed(0)} km/h、單步最少前進 ${thread.minStep.toFixed(2)} m`);
+  // 並排時旁邊的車硬擠過來（把它的車道直接改成玩家那一側）：可以被擠開、被拖慢，但不能一步被搬走好幾公尺
+  const squeeze = run((i, st, a) => { if (Math.abs(st.s - a.s) < 1.5) a.push = 1.2; });
+  check('並排時被旁邊的車擠：不會瞬間移動', squeeze.minStep > -0.2, `單步最少前進 ${squeeze.minStep.toFixed(2)} m`);
+}
+
 section('對決規則');
 {
   // 直接餵位置給計分器，逐條核對規格

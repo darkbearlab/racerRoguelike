@@ -51,9 +51,15 @@ export function collidePair(a, cfgA, b, cfgB, road, events) {
   return true;
 }
 
+// 和一般車流的碰撞。三個原則（缺一個都會出現「卡在車縫裡不動、然後瞬間移動」）：
+//   1. 追撞只認「這一步才剛碰到車尾」的淺重疊；已經並排卻深度重疊（被擠進去的）一律當側撞，不會把車一次往後搬好幾公尺
+//   2. 側撞時對方也會被擠開一點（c.push，之後慢慢回到車道中央），兩台並排的車中間才鑽得過去
+//   3. 側撞的速度損失只在剛碰到時扣一次，持續貼著只算摩擦
+const NUDGE = 0.55;   // 一般車最多被擠開多少（m）
 export function collidePlayerTraffic(st, carCfg, traffic, tcfg, road, dt, events) {
   let hits = 0;
   const hl = carCfg.halfLength, hw = carCfg.halfWidth;
+  const fresh = !(st.carHitCool > 0);
   for (const c of traffic.cars) {
     if (!c.active || c.onAlt) continue;
     const ds = c.s - st.s;
@@ -68,9 +74,9 @@ export function collidePlayerTraffic(st, carCfg, traffic, tcfg, road, dt, events
     let ud = -st.vf * sp + st.vl * cp;
     const before = Math.hypot(ut, ud);
 
-    // 以穿透較淺的軸分離；前後向要考慮相對速度，避免高速時被判成側撞
     const rel = ut - c.v;
-    const longitudinal = penS < penD * 2.5 && ((ds > 0 && rel > 0) || (ds < 0 && rel < 0));
+    const closing = (ds > 0 && rel > 0) || (ds < 0 && rel < 0);
+    const longitudinal = closing && penS < penD * 2.5 && penS < Math.abs(rel) * dt + 0.5;
     if (longitudinal) {
       if (ds > 0) {
         // 玩家追撞前車
@@ -86,10 +92,16 @@ export function collidePlayerTraffic(st, carCfg, traffic, tcfg, road, dt, events
       }
     } else {
       const side = dd > 0 ? -1 : 1; // 把玩家往遠離對方的方向推
-      st.d += side * penD;
+      // 對方先讓一點（不超過 NUDGE，也不會被擠出護欄）
+      const cdir = -side;
+      const lim = (cdir > 0 ? road.widthRight(c.s) : road.widthLeft(c.s)) - c.wid / 2 - 0.15;
+      let give = Math.min(penD * 0.5, Math.max(0, NUDGE - (c.push || 0) * cdir), Math.max(0, lim - c.d * cdir));
+      if (!(give > 0)) give = 0;
+      c.push = (c.push || 0) + cdir * give; c.d += cdir * give;
+      st.d += side * (penD - give);
       if (ud * side < 0) ud = -ud * 0.25;
-      ud += side * 1.2;
-      ut *= 1 - tcfg.sideSwipeLoss;
+      if (fresh) { ud += side * 1.2; ut *= 1 - tcfg.sideSwipeLoss; }
+      else { const scrape = (tcfg.scrapeDecel ?? 5) * dt; ut = Math.abs(ut) <= scrape ? ut : ut - Math.sign(ut) * scrape; }
     }
 
     // 側推不可把車推出護欄
@@ -102,11 +114,24 @@ export function collidePlayerTraffic(st, carCfg, traffic, tcfg, road, dt, events
     st.speed = Math.hypot(st.vf, st.vl);
     hits++;
     // 同一次接觸只計一次、只發一次事件
-    if (!(st.carHitCool > 0)) {
+    if (fresh) {
       st.carHits = (st.carHits || 0) + 1;
       if (events) events.emit('carHit', { speedLoss: Math.max(0, before - Math.hypot(ut, ud)), side: dd > 0 ? 1 : -1, longitudinal });
     }
     st.carHitCool = 0.35;
+  }
+  // 真的鑽不過去（兩邊都擠到底了還是重疊，例如旁邊的車正在切過來）：不硬擠，放慢到和那台車一樣、慢慢退到它後面
+  if (hits > 1) {
+    for (const c of traffic.cars) {
+      if (!c.active || c.onAlt) continue;
+      const ds = c.s - st.s;
+      const penS = hl + c.len / 2 - Math.abs(ds);
+      if (penS <= 0 || hw + c.wid / 2 - Math.abs(c.d - st.d) <= 0.08) continue;
+      if (ds > -1) {
+        if (st.vf > c.v) { st.vf = Math.max(c.v, st.vf - 30 * dt); st.speed = Math.hypot(st.vf, st.vl); }
+        st.s -= Math.min(penS, 9 * dt);
+      }
+    }
   }
   if (hits === 0 && st.carHitCool > 0) st.carHitCool -= dt;
   return hits;
