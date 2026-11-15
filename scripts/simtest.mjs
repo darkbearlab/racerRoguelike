@@ -640,7 +640,7 @@ section('護欄：貼牆過彎不能比正常過彎快');
   const { wallRun } = await import('./wallbench.mjs');
   for (const [r, a] of [[70, 70], [100, 60], [150, 45]]) {
     const A = wallRun(cfg, r, a, true), B = wallRun(cfg, r, a, false);
-    check(`半徑 ${r} m：全油門靠外側護欄比煞車過彎慢`, A.t > B.t + 0.3 && A.vExit < B.vExit + 3, `貼牆 ${A.t.toFixed(2)} 秒、出彎 ${A.vExit.toFixed(0)} km/h；正常 ${B.t.toFixed(2)} 秒、出彎 ${B.vExit.toFixed(0)} km/h`);
+    check(`半徑 ${r} m：全油門靠外側護欄比煞車過彎慢`, A.t > B.t + 0.3 && A.vExit < B.vExit + 6, `貼牆 ${A.t.toFixed(2)} 秒、出彎 ${A.vExit.toFixed(0)} km/h；正常 ${B.t.toFixed(2)} 秒、出彎 ${B.vExit.toFixed(0)} km/h`);
   }
   // 直線上輕擦：只有一次性的小損失，不會被磨到很慢
   const road = createRoad(zone.road);

@@ -45,6 +45,9 @@ export function spawnRival(r, def, road, s, lane) {
 /**
  * ctx: { road（對手所在的分支）, obstacles, player:{s,d,v}, phase(對決階段), slip, jctSide(玩家選的那一側) }
  */
+// 橫向反應：等級越高換車道越俐落（1 = 一般對手；可以在 rivals.json 用 agility 個別指定）
+const AGILITY = { elite: 1.3, mystery: 1.3, police: 1.3, boss: 1.6 };
+
 export function updateRival(r, dt, ctx) {
   if (!r.active) return;
   const { road, player } = ctx;
@@ -60,6 +63,7 @@ export function updateRival(r, dt, ctx) {
     caution: 1.25 - 0.55 * def.aggression,
     margin: 1.55 - 0.4 * def.aggression,
     gripUse: 0.62 + 0.36 * def.cornerSkill,
+    agility: def.agility ?? AGILITY[def.tier] ?? 1,
     topSpeedKmh: def.topSpeedKmh,
     line: false, preferD: null, speedCap: undefined,
   };

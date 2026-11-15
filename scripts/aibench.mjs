@@ -2,6 +2,8 @@
 import { readFileSync } from 'node:fs';
 import { autopilot, createAiMemory } from '../src/vehicle/ai.js';
 import { createSession } from '../src/race/session.js';
+import { tune } from '../src/vehicle/ai.js';
+if (process.env.TUNE) tune(JSON.parse(process.env.TUNE));
 const load = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), 'utf8'));
 const cfg = load('../src/config/cars.json').player;
 const zone = load('../src/config/zones.json').default;
