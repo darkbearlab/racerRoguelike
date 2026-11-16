@@ -14,6 +14,7 @@ export function createCameraRig(cfg) {
   let trauma = 0;
   let t = 0;
   let snap = true;
+  let tall = 0;   // 直式畫面的程度（0–1，進出隧道時平滑變化）
 
   const rig = {
     camera,
@@ -42,7 +43,7 @@ export function createCameraRig(cfg) {
 
     /**
      * pose: { p, f, u, l }（THREE.Vector3：位置、前、上、左）
-     * info: { kmh, vFrac, steer, lookBack, wall: { r: 道路右向量, d: 車子的橫向位置, wl, wr } }
+     * info: { kmh, vFrac, steer, lookBack, wall: { r: 道路右向量, d: 車子的橫向位置, wl, wr, roof: 在隧道裡 } }
      */
     update(pose, info, dt) {
       t += dt;
@@ -56,8 +57,12 @@ export function createCameraRig(cfg) {
         else camDir.lerp(pose.f, 1 - Math.exp(-c.follow * dt)).normalize();
         up.copy(WORLD_UP).lerp(pose.u, 0.5).normalize();
         // 速度越快鏡頭略往後拉，車子在畫面中變小、路面流動更明顯
-        const dist = c.back + (c.speedBack || 0) * info.vFrac * info.vFrac;
-        pos.copy(pose.p).addScaledVector(camDir, -dist * back).addScaledVector(up, c.height);
+        // 直式畫面：鏡頭拉高、往下看，地平線才會在畫面上方三分之一，下面留給路面與車（不然上半個畫面都是天空）。
+        // 隧道裡天花板不夠高，暫時回到原本的高度
+        const tallWant = camera.aspect < 1 && !info.wall?.roof ? 1 : 0;
+        tall = snap ? tallWant : tall + (tallWant - tall) * (1 - Math.exp(-3 * dt));
+        const dist = (c.back + (c.speedBack || 0) * info.vFrac * info.vFrac) * (1 + 0.2 * tall);
+        pos.copy(pose.p).addScaledVector(camDir, -dist * back).addScaledVector(up, c.height * (1 + 0.8 * tall));
         // 鏡頭不出護欄：車身打橫時鏡頭在車尾後方，會跑到路外面去。沿道路的右向量把它推回兩側護欄之間
         const w = info.wall;
         if (w) {
@@ -65,7 +70,7 @@ export function createCameraRig(cfg) {
           const dc = w.d + off, lim = Math.min(Math.max(dc, -(w.wl - 0.6)), w.wr - 0.6);
           if (lim !== dc) { pos.x += w.r[0] * (lim - dc); pos.y += w.r[1] * (lim - dc); pos.z += w.r[2] * (lim - dc); }
         }
-        look.copy(pose.p).addScaledVector(pose.f, c.lookAhead * back).addScaledVector(up, 0.9);
+        look.copy(pose.p).addScaledVector(pose.f, c.lookAhead * (1 - 0.5 * tall) * back).addScaledVector(up, 0.9 - 0.4 * tall);
         camera.near = 0.3;
       } else {
         up.copy(pose.u);
@@ -93,7 +98,9 @@ export function createCameraRig(cfg) {
       // 速度感 FOV
       const sf = cfg.speedFov;
       const k = THREE.MathUtils.clamp((info.kmh - sf.fromKmh) / (sf.toKmh - sf.fromKmh), 0, 1);
-      const fov = c.fov + sf.add * k;
+      let fov = c.fov + sf.add * k;
+      // 直式畫面：垂直視角不變的話左右只看得到一條車道。把垂直視角拉大，左右才看得到旁邊的車道
+      if (camera.aspect < 1) fov = Math.min(96, 2 * Math.atan(Math.tan(fov * Math.PI / 360) / Math.max(camera.aspect, 0.45) ** 0.65) * 180 / Math.PI);
       if (Math.abs(camera.fov - fov) > 0.01) camera.fov = fov;
       camera.updateProjectionMatrix();
     },

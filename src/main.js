@@ -438,9 +438,9 @@ optLyricsOff.addEventListener('input', saveSettings);
 function startRun() {
   if (started) return;
   started = true;
-  // 手機：進全螢幕並鎖成橫向（不支援的瀏覽器就照原樣）
+  // 手機：進全螢幕（直拿橫拿都可以；不支援的瀏覽器就照原樣）
   if (touch.enabled && !AUTOPILOT) {
-    try { const p = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); p?.then(() => screen.orientation?.lock?.('landscape')?.catch(() => {})).catch(() => {}); } catch { /* 不支援 */ }
+    try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch(() => {}); } catch { /* 不支援 */ }
   }
   audio.start();
   hud.title(false);
@@ -577,7 +577,7 @@ function computePose(s, d, psi, out, rd = road) {
   out.l.copy(R).multiplyScalar(-c).addScaledVector(T, -sn);
 }
 
-const camWall = { r: null, d: 0, wl: 0, wr: 0 };
+const camWall = { r: null, d: 0, wl: 0, wr: 0, roof: false };
 let gaugeTick = 0, lastGray = 0;
 let debugTick = 0;
 const jctInfo = { left: null, right: null, dist: 0, side: 0 };
@@ -647,6 +647,7 @@ function render(alpha, dt) {
   else {
     road.frame(state.s, fr);
     camWall.r = fr.r; camWall.d = state.d; camWall.wl = fr.wl; camWall.wr = fr.wr;
+    camWall.roof = !!(fr.tunnel || road.nodeTunnel(Math.floor((state.s - 12) / 2)) || road.nodeTunnel(Math.floor((state.s + 12) / 2)));
     rig.update(pose, {
       kmh, vFrac: Math.min(1, kmh / playerCfg.vMaxKmh), steer: state.steer, lookBack: input.held.lookBack, wall: camWall,
     }, paused ? 0 : dt);

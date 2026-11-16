@@ -255,9 +255,6 @@
   .touch #run { left: calc(14px + env(safe-area-inset-left, 0px)); top: 8px; }
   .touch #owned { left: calc(14px + env(safe-area-inset-left, 0px)); }
   .touch #radio { top: calc(104px + var(--mh, 0px)); }
-  #rotate { display: none; position: fixed; inset: 0; z-index: 9; background: #05080f; align-items: center; justify-content: center; flex-direction: column; font-size: 20px; letter-spacing: 6px; text-align: center; }
-  #rotate b { font-size: 54px; margin-bottom: 14px; }
-  @media (orientation: portrait) and (max-width: 640px) { .touch #rotate { display: flex; } }
 
   /* ── 矮螢幕（橫放的手機）：整體縮小 */
   @media (max-height: 520px) {
@@ -302,6 +299,58 @@
     .touch #speed { font-size: 34px; }
     .touch #speedo { bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
     .touch.manual-gas #speedo { bottom: calc(186px + env(safe-area-inset-bottom, 0px)); }
+  }
+  /* ── 直拿手機：按鈕疊在右下、選單與車卡改成直排、上方資訊錯開 */
+  @media (orientation: portrait) and (max-width: 640px) {
+    #title h1 { font-size: 50px; letter-spacing: 12px; }
+    #title h2 { font-size: 15px; margin-bottom: 30px; }
+    #settings { width: min(440px, 90vw); box-sizing: border-box; max-height: 56vh; font-size: 14px; }
+    #settings .keys { display: none; }
+    #carSelect { bottom: 2%; }
+    #carSelect h3 { font-size: 15px; margin-bottom: 8px; }
+    #carCards { flex-direction: column; gap: 6px; padding: 0 12px; }
+    #carCards .card { flex: none; min-height: 0; padding: 7px 12px; }
+    #carCards .cdesc { display: none; }
+    #carCards .cname { font-size: 17px; margin: 2px 0 2px; }
+    #carCards .cstat { display: inline-grid; width: 47%; margin-right: 2%; font-size: 11px; margin-top: 2px; }
+    #carCards .cprice { margin-top: 4px; font-size: 12px; }
+    #lookRow { margin-top: 8px; gap: 5px; padding: 0 8px; } .lchip { padding: 5px 8px; font-size: 12px; }
+    #pickBtns { margin-top: 8px; } #carHint { margin-top: 6px; font-size: 11px; }
+    #menu { padding: 10px 0 14px; } #menuTitle { font-size: 16px; margin-bottom: 8px; }
+    #menuBody { flex-direction: column; gap: 7px; padding: 0 12px; }
+    #menuBody .card { flex: none; min-height: 0; padding: 8px 40px 8px 12px; }
+    #menuBody .card.active { transform: none; }
+    .cname { font-size: 17px; margin: 2px 0 3px; } .cdesc { font-size: 13px; line-height: 1.4; }
+    #run { font-size: 12px; line-height: 1.45; } #run b { font-size: 15px; } #run .nightLine { font-size: 11px; }
+    #owned { top: 78px; max-width: 46vw; line-height: 1.5; } #owned span { font-size: 10px; padding: 0 5px; }
+    .bar { top: 58px; width: 34%; } #barP { left: 3%; } #barR { right: 3%; }
+    .bar .num { font-size: 17px; margin: 0 3px; } .bar .who { font-size: 10px; letter-spacing: 1px; } .track { height: 9px; }
+    #gap { top: calc(54px + var(--mh, 0px)); } #gapNum { font-size: 28px; } #gapNote { font-size: 10px; letter-spacing: 1px; }
+    #clockTime { font-size: 22px; } #clockLeft { font-size: 10px; letter-spacing: 1px; }
+    .jtab { top: calc(112px + var(--mh, 0px)); font-size: 14px; padding: 4px 9px; } .jtab .jd { font-size: 11px; }
+    #jctL { right: auto; left: 8px; text-align: left; } #jctR { left: auto; right: 8px; text-align: right; }
+    #radio { left: 10px; right: 10px; width: auto; top: calc(170px + var(--mh, 0px)); padding: 6px 8px; } .touch #radio { top: calc(170px + var(--mh, 0px)); }
+    #radioFace { flex-basis: 36px; height: 36px; font-size: 19px; } #radioText { font-size: 13px; }
+    #count { font-size: 110px; }
+    #banner { font-size: 38px; letter-spacing: 8px; } #banner small { font-size: 13px; letter-spacing: 2px; }
+    #bossCard .bn { font-size: 44px; letter-spacing: 12px; } #bossCard .bl { font-size: 14px; padding: 0 12px; } #bossCard .bb { padding: 0 12px; }
+    #night div { font-size: 17px; letter-spacing: 8px; } #night b { font-size: 40px; letter-spacing: 10px; }
+    #toast { font-size: 15px; letter-spacing: 2px; width: max-content; max-width: 90vw; text-align: center; box-sizing: border-box; }
+    #wrong { font-size: 26px; letter-spacing: 6px; padding: 8px 16px 6px; } #wrong small { font-size: 11px; letter-spacing: 3px; }
+    #prompt { font-size: 15px; bottom: 34%; white-space: nowrap; }
+    #over h1 { font-size: 36px; letter-spacing: 8px; } #over p { margin-bottom: 14px; font-size: 13px; text-align: center; padding: 0 12px; }
+    #over table { font-size: 14px; } #over td { padding: 5px 10px; } #over td:last-child { max-width: 56vw; }
+    #pause { font-size: 30px; }
+    #lyrics { left: 80%; top: 22%; max-height: 36vh; }
+    #tSteer { width: 46vw; height: 132px; left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+    #tBrake { width: 92px; height: 92px; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+    #tDrift { width: 78px; height: 78px; right: calc(21px + env(safe-area-inset-right, 0px)); bottom: calc(122px + env(safe-area-inset-bottom, 0px)); }
+    .manual-gas #tGas { width: 92px; height: 92px; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+    .manual-gas #tBrake { width: 78px; height: 78px; right: calc(21px + env(safe-area-inset-right, 0px)); bottom: calc(122px + env(safe-area-inset-bottom, 0px)); }
+    .manual-gas #tDrift { width: 68px; height: 68px; right: calc(110px + env(safe-area-inset-right, 0px)); bottom: calc(126px + env(safe-area-inset-bottom, 0px)); }
+    .touch #speedo { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(212px + env(safe-area-inset-bottom, 0px)); }
+    .touch.manual-gas #speedo { bottom: calc(212px + env(safe-area-inset-bottom, 0px)); }
+    .touch #speed { font-size: 38px; }
   }
 </style>
 </head>
@@ -382,7 +431,6 @@
     <div id="drift">DRIFT</div>
   </div>
   <div id="pause">暫停<small><span class="only-keys">按 Esc 繼續</span><span class="only-touch">點一下繼續</span></small></div>
-  <div id="rotate"><b>⟳</b>請把手機橫放</div>
 </div>
 <script type="module" src="/src/main.js"></script>
 </body>
