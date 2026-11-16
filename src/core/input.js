@@ -1,4 +1,4 @@
-// 鍵盤＋手把輸入。held 值給物理用，edge（剛按下）每個渲染幀取一次。
+// 鍵盤＋手把＋觸控輸入。held 值給物理用，edge（剛按下）每個渲染幀取一次。
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 const DEADZONE = 0.14;
 
@@ -9,7 +9,8 @@ function curve(v) {
   return Math.sign(v) * n * n * n * 0.6 + Math.sign(v) * n * 0.4;
 }
 
-export function createInput() {
+/** touch：ui/touch.js 的觸控狀態（可省略） */
+export function createInput(touch = null) {
   const keys = new Set();
   const pressed = new Set();
   let padPrev = [];
@@ -59,6 +60,16 @@ export function createInput() {
         lookBack = lookBack || pad.b[4] > 0.5;
       }
 
+      let tEdges = null;
+      if (touch) tEdges = touch.take();   // 畫面上的按鈕（點暫停畫面繼續…）滑鼠也會用到
+      if (touch && touch.enabled) {
+        if (touch.steer !== 0 && steer === 0) { steer = touch.steer; analog = true; }
+        brake = Math.max(brake, touch.brake ? 1 : 0);
+        handbrake = handbrake || touch.drift;
+        // 自動油門：沒踩煞車就一直給油（拇指空出來按甩尾）；關掉時用油門鍵
+        throttle = Math.max(throttle, touch.autoGas ? (brake > 0 ? 0 : 1) : touch.gas ? 1 : 0);
+      }
+
       held.throttle = throttle;
       held.brake = brake;
       held.steer = steer; // +1 = 左
@@ -73,9 +84,9 @@ export function createInput() {
         : pressed.has('ArrowDown') || pressed.has('KeyS') || padEdges.has(13) ? 'down' : null;
       const edges = {
         menu,
-        view: pressed.has('KeyC') || padEdges.has(11),
+        view: pressed.has('KeyC') || padEdges.has(11) || !!tEdges?.has('view'),
         flash: pressed.has('KeyH') || padEdges.has(3),
-        pause: pressed.has('Escape') || padEdges.has(9),
+        pause: pressed.has('Escape') || padEdges.has(9) || !!tEdges?.has('pause'),
       };
       pressed.clear();
       return edges;

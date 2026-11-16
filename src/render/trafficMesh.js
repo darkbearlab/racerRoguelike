@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildCar } from './carBuilder.js';
 import { makeFrame } from '../road/spline.js';
+import { createPlateAtlas, PLATE_W, PLATE_H, COLS, ROWS } from './plate.js';
 
 // 車流的畫面：每種車一個 InstancedMesh，加上尾燈、頭燈、方向燈、尾燈光暈。
 // 所有矩陣以玩家位置為基準，開得再遠也不抖。
@@ -33,7 +34,7 @@ export function createTrafficMesh(scene, road, traffic, cfg, models, opts = {}) 
   const lightY = {};
   for (const [type, t] of Object.entries(cfg.types)) {
     const built = buildCar(models[t.model], { wheels: true });
-    lightY[type] = { tail: built.dims.tailY, head: built.dims.noseY };
+    lightY[type] = { tail: built.dims.tailY, head: built.dims.noseY, plate: built.plate };
     const m = new THREE.InstancedMesh(built.geometry, bodyMat, N);
     m.frustumCulled = false;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -53,6 +54,26 @@ export function createTrafficMesh(scene, road, traffic, cfg, models, opts = {}) 
   const tails = lightMesh(N * 2);   // 每台車左右各一顆
   const heads = lightMesh(N * 2);
   const blinks = lightMesh(N * 2);
+
+  // 車牌：每台車前後各一片，共用一張圖集，每個 instance 用 aPlate 指定第幾格
+  const plateGeo = new THREE.PlaneGeometry(PLATE_W, PLATE_H);
+  const plateIdx = new THREE.InstancedBufferAttribute(new Float32Array(N * 2), 1).setUsage(THREE.DynamicDrawUsage);
+  plateGeo.setAttribute('aPlate', plateIdx);
+  const plateMat = new THREE.MeshBasicMaterial({ map: createPlateAtlas(reverse ? 13 : 7), color: 0xffffff });
+  plateMat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aPlate;')
+      .replace('#include <uv_vertex>', `#include <uv_vertex>
+  vMapUv = vec2((vMapUv.x + mod(aPlate, ${COLS}.0)) / ${COLS}.0, 1.0 - (1.0 - vMapUv.y + floor(aPlate / ${COLS}.0)) / ${ROWS}.0);`);
+  };
+  plateMat.customProgramCacheKey = () => 'plateAtlas';
+  const plates = new THREE.InstancedMesh(plateGeo, plateMat, N * 2);
+  plates.frustumCulled = false;
+  plates.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  plates.setColorAt(0, new THREE.Color(1, 1, 1));
+  group.add(plates);
+  const LIT = new THREE.Color(0.6, 0.6, 0.58), UNLIT = new THREE.Color(0.3, 0.3, 0.29);
+  const FLIP = new THREE.Matrix4().makeRotationY(Math.PI);
 
   const haloGeo = new THREE.BufferGeometry();
   haloGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3).setUsage(THREE.DynamicDrawUsage));
@@ -96,6 +117,7 @@ export function createTrafficMesh(scene, road, traffic, cfg, models, opts = {}) 
         if (!c.active || c.hidden) {
           for (let k = 0; k < 2; k++) { tails.setMatrixAt(i * 2 + k, ZERO); heads.setMatrixAt(i * 2 + k, ZERO); }
           blinks.setMatrixAt(i * 2, ZERO); blinks.setMatrixAt(i * 2 + 1, ZERO);
+          plates.setMatrixAt(i * 2, ZERO); plates.setMatrixAt(i * 2 + 1, ZERO);
           hp.setXYZ(i, 0, -9999, 0);
           continue;
         }
@@ -130,6 +152,15 @@ export function createTrafficMesh(scene, road, traffic, cfg, models, opts = {}) 
           heads.setColorAt(i * 2 + k, WHITE);
         }
 
+        // 車牌：後面那片轉 180° 朝後
+        const pl = lightY[c.type].plate, pk = Math.floor(c.hue * COLS * ROWS) % (COLS * ROWS);
+        local.copy(FLIP).setPosition(0, pl.rear.y, pl.rear.z);
+        plates.setMatrixAt(i * 2, m4.multiplyMatrices(base, local));
+        local.identity().setPosition(0, pl.front.y, pl.front.z);
+        plates.setMatrixAt(i * 2 + 1, m4.multiplyMatrices(base, local));
+        plates.setColorAt(i * 2, LIT); plates.setColorAt(i * 2 + 1, UNLIT);
+        plateIdx.array[i * 2] = pk; plateIdx.array[i * 2 + 1] = pk;
+
         // 方向燈：blink > 0 = 往右（車身 −x）
         if (c.blink !== 0 && blinkOn) {
           const x = -c.blink * (c.wid / 2 - 0.12);
@@ -160,7 +191,8 @@ export function createTrafficMesh(scene, road, traffic, cfg, models, opts = {}) 
         bodies[type].instanceMatrix.needsUpdate = true;
         if (bodies[type].instanceColor) bodies[type].instanceColor.needsUpdate = true;
       }
-      for (const m of [tails, heads, blinks]) {
+      plateIdx.needsUpdate = true;
+      for (const m of [tails, heads, blinks, plates]) {
         m.instanceMatrix.needsUpdate = true;
         if (m.instanceColor) m.instanceColor.needsUpdate = true;
       }

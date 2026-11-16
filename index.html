@@ -2,10 +2,13 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>深夜高架 Roguelike｜M6 完整一局</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; }
+  html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; overscroll-behavior: none; }
+  #game, #hud { touch-action: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   body { font-family: "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; color: #e8eef8; }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   #hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
@@ -105,6 +108,7 @@
   #title p { margin-top: 30px; font-size: 13px; letter-spacing: 2px; opacity: .6; }
   #settings { display: none; width: 440px; max-height: 62vh; overflow-y: auto; padding: 18px 22px; background: rgba(12,16,26,.92); border: 1px solid #55617a; border-radius: 6px; font-size: 15px; }
   #settings.on { display: block; }
+  #settings { touch-action: pan-y; }
   #settings label { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.1); cursor: pointer; }
   #settings .keys { margin-top: 12px; font-size: 13px; line-height: 1.8; opacity: .85; columns: 2; }
   #settings .keys b { color: #9fd0ff; font-weight: 600; margin-right: 8px; }
@@ -179,7 +183,7 @@
   /* 開局選車：標題與按鈕收起來，三張車卡排在畫面下方，上面看得到正在預覽的車 */
   #carSelect { display: none; position: absolute; left: 0; right: 0; bottom: 5%; }
   .picking #carSelect { display: block; }
-  .picking #title h1, .picking #title h2, .picking #title .tbtn, .picking #title > p, .picking #settings { display: none !important; }
+  .picking #title h1, .picking #title h2, .picking #title > .tbtn, .picking #title > p, .picking #settings { display: none !important; }
   .picking #title { background: none; }
   #carSelect h3 { text-align: center; font-size: 18px; letter-spacing: 6px; margin: 0 0 12px; font-weight: 400; text-shadow: 0 1px 6px #000; }
   #carCards { display: flex; justify-content: center; gap: 14px; padding: 0 16px; }
@@ -202,9 +206,103 @@
   #owned span { display: inline-block; font-size: 12px; letter-spacing: 1px; padding: 0 7px; margin: 0 4px 3px 0; border-radius: 3px;
                 background: rgba(22,28,40,.8); border: 1px solid #55617a; }
   #owned span.r-rare { border-color: #5aa6ff; } #owned span.r-legendary { border-color: #ffb43a; }
-  #pause { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column;
+  #pause { pointer-events: auto; cursor: pointer; position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column;
            background: rgba(5,8,15,.6); font-size: 40px; letter-spacing: 12px; }
   #pause small { font-size: 14px; letter-spacing: 2px; opacity: .7; margin-top: 14px; }
+  #menu { pointer-events: auto; }
+  #menu [data-dir] { cursor: pointer; }
+  .mskip { display: inline-block; padding: 4px 14px; border: 1px solid rgba(255,255,255,.35); border-radius: 4px; }
+  #btnRestart { margin-top: 24px; width: 220px; }
+  #pickBtns { display: none; justify-content: center; gap: 12px; margin-top: 10px; }
+  #pickBtns .tbtn { width: 150px; margin: 0; padding: 8px 0; font-size: 17px; }
+  .only-touch { display: none; }
+  .touch .only-touch { display: revert; }
+  .touch .only-keys { display: none; }
+  .touch #pickBtns { display: flex; }
+
+  /* ── 觸控操作：左下方向盤、右下煞車與甩尾、右上視角與暫停 */
+  #touch { display: none; }
+  .touch #touch { display: block; }
+  .title-on #touch, .menu-open #touch { display: none; }
+  #touch > div { position: absolute; pointer-events: auto; box-sizing: border-box; color: rgba(255,255,255,.8); }
+  #tSteer { left: calc(14px + env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: min(40vw, 300px); height: min(34vh, 150px);
+            display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-radius: 18px;
+            background: rgba(20,28,44,.32); border: 2px solid rgba(190,210,255,.3); }
+  #tSteer i { font-style: normal; font-size: 26px; opacity: .55; }
+  #tKnob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(160,200,255,.3); border: 2px solid rgba(210,230,255,.6); }
+  #tSteer.on { background: rgba(40,60,100,.42); } #tSteer.on #tKnob { background: rgba(160,210,255,.6); }
+  .tbn { display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 16px; letter-spacing: 2px; font-weight: 700;
+         background: rgba(20,28,44,.36); border: 2px solid rgba(190,210,255,.35); }
+  .tbn.on { background: rgba(90,130,200,.6); border-color: #fff; }
+  #tBrake { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 104px; height: 104px; border-color: rgba(255,150,130,.55); }
+  #tDrift { right: calc(132px + env(safe-area-inset-right, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: 84px; height: 84px; border-color: rgba(255,200,110,.55); }
+  #tGas { display: none !important; }
+  .manual-gas #tGas { display: flex !important; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 104px; height: 104px; border-color: rgba(130,220,160,.6); }
+  .manual-gas #tBrake { right: calc(130px + env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: 86px; height: 86px; }
+  .manual-gas #tDrift { right: calc(74px + env(safe-area-inset-right, 0px)); bottom: calc(126px + env(safe-area-inset-bottom, 0px)); width: 76px; height: 76px; }
+  .tsm { top: calc(8px + env(safe-area-inset-top, 0px)); height: 38px; min-width: 44px; padding: 0 12px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 14px; letter-spacing: 2px;
+         background: rgba(20,28,44,.4); border: 1px solid rgba(190,210,255,.35); }
+  #tPause { right: calc(10px + env(safe-area-inset-right, 0px)); font-weight: 800; }
+  #tView { right: calc(64px + env(safe-area-inset-right, 0px)); }
+  /* 觸控時時速表搬到按鈕上方（正下方是自己的車，不能擋），按鍵說明收起來 */
+  .touch #help { display: none; }
+  .touch #speedo { right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(132px + env(safe-area-inset-bottom, 0px)); }
+  .touch.manual-gas #speedo { bottom: calc(210px + env(safe-area-inset-bottom, 0px)); }
+  .touch #rpm { margin-top: 5px; width: 130px; height: 6px; }
+  .touch #speed { font-size: 44px; }
+  .touch #speedo small { font-size: 13px; }
+  .touch #drift { margin-top: 4px; font-size: 12px; }
+  .touch #run { left: calc(14px + env(safe-area-inset-left, 0px)); top: 8px; }
+  .touch #owned { left: calc(14px + env(safe-area-inset-left, 0px)); }
+  .touch #radio { top: calc(104px + var(--mh, 0px)); }
+  #rotate { display: none; position: fixed; inset: 0; z-index: 9; background: #05080f; align-items: center; justify-content: center; flex-direction: column; font-size: 20px; letter-spacing: 6px; text-align: center; }
+  #rotate b { font-size: 54px; margin-bottom: 14px; }
+  @media (orientation: portrait) and (max-width: 640px) { .touch #rotate { display: flex; } }
+
+  /* ── 矮螢幕（橫放的手機）：整體縮小 */
+  @media (max-height: 520px) {
+    #title h1 { font-size: 42px; letter-spacing: 12px; }
+    #title h2 { font-size: 13px; margin: 2px 0 14px; }
+    .tbtn { width: 220px; margin: 4px 0; padding: 7px 0; font-size: 16px; }
+    #title > p { margin-top: 10px; font-size: 12px; }
+    #title:has(#settings.on) h1, #title:has(#settings.on) h2, #title:has(#settings.on) > p, #title:has(#settings.on) #btnStart, #title:has(#settings.on) #btnBoss { display: none; }
+    #settings { width: min(480px, 88vw); max-height: 74vh; padding: 10px 16px; font-size: 14px; }
+    #settings .keys { display: none; }
+    #carSelect { bottom: 2%; }
+    #carSelect h3 { font-size: 14px; margin-bottom: 6px; }
+    .card { min-height: 0; padding: 7px 10px; }
+    .cname { font-size: 16px; margin: 2px 0 3px; } .cdesc { font-size: 12px; line-height: 1.35; } .cmeta { font-size: 10px; } .ckey { font-size: 16px; top: 5px; }
+    #carCards .cdesc { display: none; }
+    .cstat { font-size: 11px; margin-top: 2px; } .cprice { margin-top: 4px; font-size: 12px; }
+    #lookRow { margin-top: 6px; gap: 5px; } .lchip { padding: 4px 8px; font-size: 12px; }
+    #pickBtns { margin-top: 6px; } #pickBtns .tbtn { padding: 5px 0; font-size: 15px; }
+    #carHint { margin-top: 5px; font-size: 11px; }
+    #menu { padding: 8px 0 10px; } #menuTitle { font-size: 15px; margin-bottom: 6px; } #menuBody { gap: 8px; padding: 0 10px; } #menuHint { margin-top: 6px; font-size: 13px; }
+    #run { font-size: 12px; line-height: 1.45; } #run b { font-size: 15px; } #run .nightLine { font-size: 11px; }
+    #owned { top: 78px; max-width: 190px; line-height: 1.5; } #owned span { font-size: 10px; padding: 0 5px; }
+    .bar { top: 54px; width: 26%; } .bar .num { font-size: 17px; } .bar .who { font-size: 11px; letter-spacing: 2px; } .track { height: 9px; }
+    #gap { top: calc(56px + var(--mh, 0px)); } #gapNum { font-size: 30px; } #gapNote { font-size: 11px; }
+    #clockTime { font-size: 22px; } #clockLeft { font-size: 11px; }
+    .jtab { font-size: 14px; padding: 4px 9px; } .jtab .jd { font-size: 11px; }
+    #jctL { right: calc(50% + 58px); } #jctR { left: calc(50% + 58px); }
+    #count { font-size: 96px; }
+    #banner { font-size: 38px; letter-spacing: 10px; top: 30%; } #banner small { font-size: 13px; }
+    #bossCard { top: 22%; padding: 8px 0; } #bossCard .bn { font-size: 40px; letter-spacing: 12px; } #bossCard .bl { font-size: 14px; } #bossCard .bt { font-size: 12px; }
+    #night div { font-size: 16px; } #night b { font-size: 38px; }
+    #toast { font-size: 15px; letter-spacing: 2px; top: calc(24% + var(--mh, 0px)); white-space: nowrap; }
+    #wrong { font-size: 24px; letter-spacing: 6px; padding: 6px 18px 5px; } #wrong small { font-size: 11px; }
+    #prompt { font-size: 15px; bottom: 30%; }
+    #radio { width: 220px; padding: 5px 8px; } #radioFace { flex-basis: 34px; height: 34px; font-size: 18px; } #radioText { font-size: 13px; }
+    #over h1 { font-size: 30px; margin-bottom: 2px; } #over p { margin-bottom: 8px; font-size: 13px; }
+    #over table { font-size: 13px; } #over td { padding: 2px 14px; } #over small { margin-top: 8px; font-size: 12px; } #btnRestart { margin-top: 8px; }
+    #pause { font-size: 28px; }
+    #lyrics { top: 26%; }
+    #tBrake { width: 92px; height: 92px; } #tDrift { width: 76px; height: 76px; right: calc(118px + env(safe-area-inset-right, 0px)); }
+    .manual-gas #tGas { width: 92px; height: 92px; } .manual-gas #tBrake { width: 76px; height: 76px; right: calc(116px + env(safe-area-inset-right, 0px)); } .manual-gas #tDrift { width: 68px; height: 68px; bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+    .touch #speed { font-size: 34px; }
+    .touch #speedo { bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
+    .touch.manual-gas #speedo { bottom: calc(186px + env(safe-area-inset-bottom, 0px)); }
+  }
 </style>
 </head>
 <body>
@@ -233,11 +331,12 @@
   <div id="title">
     <h1>深夜高架</h1>
     <h2>ROGUELIKE</h2>
-    <button class="tbtn sel" id="btnStart">開始<small>Enter</small></button>
-    <button class="tbtn" id="btnBoss">Boss 連戰<small>B</small></button>
-    <button class="tbtn" id="btnSettings">設定<small>Tab</small></button>
+    <button class="tbtn sel" id="btnStart">開始<small class="only-keys">Enter</small></button>
+    <button class="tbtn" id="btnBoss">Boss 連戰<small class="only-keys">B</small></button>
+    <button class="tbtn" id="btnSettings">設定<small class="only-keys">Tab</small></button>
     <div id="settings">
       <label>後照鏡（畫面上方；會多畫一次場景）<input type="checkbox" id="optMirror"></label>
+      <label>觸控：自動油門（關掉會多一顆油門鍵）<input type="checkbox" id="optAutoGas"></label>
       <label>高畫質光影（關閉可提升效能）<input type="checkbox" id="optGfx"></label>
       <label>濕路面反射（需開啟高畫質光影）<input type="checkbox" id="optWet"></label>
       <label>高速時的徑向模糊（需開啟高畫質光影）<input type="checkbox" id="optBlur"></label>
@@ -261,10 +360,11 @@
       <h3>選擇你的車</h3>
       <div id="carCards"></div>
       <div id="lookRow"></div>
-      <div id="carHint">← → 選車　1–5 換外觀（Shift 往回）　Enter 出發　Esc 返回</div>
+      <div id="pickBtns"><button class="tbtn" id="btnBack">返回</button><button class="tbtn sel" id="btnGo">出發</button></div>
+      <div id="carHint"><span class="only-keys">← → 選車　1–5 換外觀（Shift 往回）　Enter 出發　Esc 返回</span><span class="only-touch">點車卡預覽，點下方的項目換外觀</span></div>
     </div>
   </div>
-  <div id="over"><h1 id="overTitle">天亮了</h1><p id="overSub"></p><table id="overTable"></table><small>按 R 重新開始</small></div>
+  <div id="over"><h1 id="overTitle">天亮了</h1><p id="overSub"></p><table id="overTable"></table><small class="only-keys">按 R 重新開始</small><button class="tbtn" id="btnRestart">重新開始</button></div>
   <div id="toast"></div>
   <div id="wrong">⚠ 逆向行駛<small>WRONG WAY　請掉頭</small></div>
   <div id="help">
@@ -281,7 +381,8 @@
     <div id="rpm"><div id="rpmFill"></div></div>
     <div id="drift">DRIFT</div>
   </div>
-  <div id="pause">暫停<small>按 Esc 繼續</small></div>
+  <div id="pause">暫停<small><span class="only-keys">按 Esc 繼續</span><span class="only-touch">點一下繼續</span></small></div>
+  <div id="rotate"><b>⟳</b>請把手機橫放</div>
 </div>
 <script type="module" src="/src/main.js"></script>
 </body>

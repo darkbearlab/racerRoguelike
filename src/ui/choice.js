@@ -3,8 +3,9 @@ const CATEGORY = { part: '零件', skill: '駕駛技能', tradeoff: '取捨', pa
 const RARITY = { common: '普通', rare: '稀有', legendary: '傳說' };
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
+const DIR = { '←': 'left', '↑': 'up', '→': 'right' };
 function card(def, { key, price, sold, active, count, cantAfford }) {
-  return `<div class="card r-${def.rarity}${active ? ' active' : ''}${sold ? ' sold' : ''}">
+  return `<div class="card r-${def.rarity}${active ? ' active' : ''}${sold ? ' sold' : ''}"${DIR[key] ? ` data-dir="${DIR[key]}"` : ''}>
     <div class="ckey">${key || ''}</div>
     <div class="cmeta">${CATEGORY[def.category] || ''}・${RARITY[def.rarity] || ''}</div>
     <div class="cname">${esc(def.name)}${count > 1 ? ` ×${count}` : ''}</div>
@@ -35,12 +36,12 @@ export function createChoiceUi() {
           title.textContent = `PA 休息站　賞金 ${run.bounty}`;
           const keys = ['←', '↑', '→'];
           body.innerHTML = m.cards.map((d, i) => card(d, { key: keys[i], count: d.time ? 0 : upgrades.count(d.id) + 1, price: m.prices[i], cantAfford: run.bounty < m.prices[i] })).join('');
-          hint.textContent = `買一樣就上路　↓ 不買，離開${m.note ? '　｜　' + m.note : ''}`;
+          hint.innerHTML = `買一樣就上路　<span class="mskip" data-dir="down">↓ 不買，離開</span>${m.note ? '　｜　' + esc(m.note) : ''}`;
         } else if (m && m.kind === 'choice') {
           title.textContent = '選擇一項成長';
           const keys = m.cards.length === 3 ? ['←', '↑', '→'] : m.cards.length === 2 ? ['←', '→'] : ['↑'];
           body.innerHTML = m.cards.map((d, i) => card(d, { key: keys[i], count: upgrades.count(d.id) + 1 })).join('');
-          hint.textContent = '↓ 都不要，改拿賞金';
+          hint.innerHTML = '<span class="mskip" data-dir="down">↓ 都不要，改拿賞金</span>';
         } else if (m && m.kind === 'shop') {
           if (m.mode === 'remove') {
             title.textContent = '移除哪一個成長？';

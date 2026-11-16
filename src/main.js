@@ -17,6 +17,7 @@ import { createRng } from './core/rng.js';
 import { createEvents } from './core/events.js';
 import { createLoop } from './core/time.js';
 import { createInput } from './core/input.js';
+import { createTouch } from './ui/touch.js';
 import { makeFrame } from './road/spline.js';
 import { createStreamer } from './road/streamer.js';
 import { autopilot, createAiMemory } from './vehicle/ai.js';
@@ -58,7 +59,8 @@ const upgradeCfg = structuredClone(upgradesJson);
 const zone = zonesJson.default;
 
 const events = createEvents();
-const input = createInput();
+const touch = createTouch({ force: params.get('touch') === '1' });
+const input = createInput(touch);
 const hud = createHud(DEBUG);
 // 事件要在建立 session 之前掛好：開局就會插入第一個交流道
 const boot = [];
@@ -133,7 +135,7 @@ function rivalLook(def) {
     glyph: 'glyph' in o ? o.glyph : def.name[0], name: def.name, taunts: looksJson.taunts,
   };
 }
-const dressRival = (def, fallback) => { rivalCar.setSpec(modelsJson[def.model] || modelsJson[fallback], def.color); rivalCar.setLook(rivalLook(def)); };
+const dressRival = (def, fallback) => { rivalCar.setSpec(modelsJson[def.model] || modelsJson[fallback], def.color); rivalCar.setLook(rivalLook(def)); rivalCar.setPlate(hashStr(String(def.id || def.name))); };
 car = createCarModel({ spec: modelsJson[carCfg.model] || modelsJson.coupe, color: starter.color });
 applyLook();
 scene.add(car.group);
@@ -256,7 +258,7 @@ const buffText = (def) => (def.buffList || []).map((it) => it.def.name + (it.cou
 events.on('packSpawn', (e) => {
   e.defs.slice(1).forEach((def, k) => {
     const m = packCars[k];
-    m.setSpec(modelsJson[def.model] || modelsJson.police, def.color); m.setLook(rivalLook(def));
+    m.setSpec(modelsJson[def.model] || modelsJson.police, def.color); m.setLook(rivalLook(def)); m.setPlate(hashStr(String(def.id || def.name)) + k + 1);
     m.marker.material.color.setRGB(0.5, 1.0, 3.4);
   });
   hud.toast(`🚨 ${e.defs.length} 台巡邏車　要領先全部才算得分`, 3.2);
@@ -324,6 +326,13 @@ function autoOpts() {
 }
 // 會影響模擬的操作一律經過 recorder，重播才對得上
 const menuInput = (d) => { recorder.call('menu', d); menus.input(d); };
+// 觸控／滑鼠：直接點卡片（等同按那張卡的方向鍵）
+document.getElementById('menu').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-dir]');
+  if (el && menus.current && !paused) menuInput(el.dataset.dir);
+});
+document.getElementById('pause').addEventListener('click', () => touch.fire('pause'));
+document.getElementById('btnRestart').addEventListener('click', () => location.reload());
 const playerInput = () => (AUTOPILOT ? autopilot(state, playerCfg, road, autoOpts(), aiInput) : input.held);
 
 // 自動駕駛時也自動操作選單：三選一拿第一張；商店買得起就買，然後離開
@@ -341,7 +350,7 @@ function autoMenu() {
 let started = AUTOPILOT;
 let titleTime = 0;
 const btnStart = document.getElementById('btnStart'), btnSettings = document.getElementById('btnSettings'), settingsEl = document.getElementById('settings');
-const optMirror = document.getElementById('optMirror'), optGfx = document.getElementById('optGfx'), optWet = document.getElementById('optWet'), optBlur = document.getElementById('optBlur'), optVol = document.getElementById('optVol'), optMusic = document.getElementById('optMusic'), optSfx = document.getElementById('optSfx'), optLyrics = document.getElementById('optLyrics'), optLyricsOff = document.getElementById('optLyricsOff'), optLyricsOffV = document.getElementById('optLyricsOffV');
+const optMirror = document.getElementById('optMirror'), optGfx = document.getElementById('optGfx'), optWet = document.getElementById('optWet'), optBlur = document.getElementById('optBlur'), optVol = document.getElementById('optVol'), optMusic = document.getElementById('optMusic'), optSfx = document.getElementById('optSfx'), optAutoGas = document.getElementById('optAutoGas'), optLyrics = document.getElementById('optLyrics'), optLyricsOff = document.getElementById('optLyricsOff'), optLyricsOffV = document.getElementById('optLyricsOffV');
 try {
   const saved = JSON.parse(localStorage.getItem('settings') || '{}');
   if (typeof saved.mirror === 'boolean') camCfg.mirror = saved.mirror;
@@ -354,8 +363,12 @@ try {
   if (typeof saved.lyrics === 'boolean') lyrics.enabled = saved.lyrics;
   if (typeof saved.lyricsOff === 'number') lyrics.offset = saved.lyricsOff;
   if (Array.isArray(saved.bgmOff)) audio.tracksOff = saved.bgmOff;
+  if (typeof saved.autoGas === 'boolean') touch.setAutoGas(saved.autoGas);
+  // 手機第一次開：預設用省效能的畫質、不開後照鏡（之後照玩家自己存的設定）
+  if (touch.enabled && saved.gfx === undefined && !params.get('gfx')) { gfx.quality = 'low'; camCfg.mirror = false; }
 } catch { /* 讀不到就用預設值 */ }
 optMirror.checked = !!camCfg.mirror;
+optAutoGas.checked = touch.autoGas;
 optGfx.checked = gfx.quality !== 'low';
 optWet.checked = gfx.wet;
 optBlur.checked = gfx.blur;
@@ -367,6 +380,7 @@ optLyricsOff.value = String(Math.round(lyrics.offset * 10)); optLyricsOffV.textC
 applyGfx();
 const saveSettings = () => {
   camCfg.mirror = optMirror.checked;
+  touch.setAutoGas(optAutoGas.checked);
   gfx.quality = optGfx.checked ? 'high' : 'low';
   gfx.wet = optWet.checked;
   gfx.blur = optBlur.checked;
@@ -376,9 +390,10 @@ const saveSettings = () => {
   lyrics.enabled = optLyrics.checked;
   lyrics.offset = Number(optLyricsOff.value) / 10; optLyricsOffV.textContent = lyrics.offset.toFixed(1);
   applyGfx();
-  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume, lyrics: lyrics.enabled, lyricsOff: lyrics.offset, bgmOff: audio.tracksOff })); } catch { /* 存不了就算了 */ }
+  try { localStorage.setItem('settings', JSON.stringify({ mirror: camCfg.mirror, gfx: gfx.quality, wet: gfx.wet, blur: gfx.blur, vol: audio.volume, music: audio.musicVolume, sfx: audio.sfxVolume, lyrics: lyrics.enabled, lyricsOff: lyrics.offset, bgmOff: audio.tracksOff, autoGas: touch.autoGas })); } catch { /* 存不了就算了 */ }
 };
 optMirror.addEventListener('change', saveSettings);
+optAutoGas.addEventListener('change', saveSettings);
 optGfx.addEventListener('change', saveSettings);
 optWet.addEventListener('change', saveSettings);
 optBlur.addEventListener('change', saveSettings);
@@ -423,6 +438,10 @@ optLyricsOff.addEventListener('input', saveSettings);
 function startRun() {
   if (started) return;
   started = true;
+  // 手機：進全螢幕並鎖成橫向（不支援的瀏覽器就照原樣）
+  if (touch.enabled && !AUTOPILOT) {
+    try { const p = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); p?.then(() => screen.orientation?.lock?.('landscape')?.catch(() => {})).catch(() => {}); } catch { /* 不支援 */ }
+  }
   audio.start();
   hud.title(false);
   rig.setView('chase');
@@ -462,6 +481,8 @@ function cycleLook(k, dir = 1) {
   if (picking) drawLookRow();
   drawLookRow();
 }
+document.getElementById('btnGo').addEventListener('click', () => confirmPick());
+document.getElementById('btnBack').addEventListener('click', () => closePick());
 lookRow.addEventListener('click', (e) => { const b = e.target.closest('.lchip'); if (b) cycleLook(b.dataset.k, e.shiftKey ? -1 : 1); });
 function openPick() {
   if (started || picking) return;
@@ -474,7 +495,10 @@ function openPick() {
   }).join('');
   [...carCards.children].forEach((el, k) => {
     el.addEventListener('mouseenter', () => showPick(k));
-    el.addEventListener('click', () => { showPick(k); confirmPick(); });
+    // 滑鼠：移上去預覽、點下去出發。觸控沒有「移上去」：第一下預覽，再點同一張才出發
+    let wasSel = false;
+    el.addEventListener('pointerdown', (e) => { wasSel = e.pointerType === 'mouse' || k === pickIdx; });
+    el.addEventListener('click', () => { showPick(k); if (wasSel) confirmPick(); });
   });
   document.body.classList.add('picking');
   showPick(pickIdx);
@@ -796,7 +820,7 @@ addEventListener('keydown', (e) => { if (e.code === 'F9') { e.preventDefault(); 
 
 // 除錯與自動化測試用
 window.__game = {
-  recorder, saveReplay,
+  recorder, saveReplay, input, touch,
   post, gfx, applyGfx, streamer, scene, trails, reflection, audio, starters, openPick, showPick, confirmPick,
   models: modelsJson,
   lyrics, session, state, road, carCfg, playerCfg, upgrades, menus, camCfg, trafficCfg, duelCfg, runCfg, clock, flow, rig, loop, renderer, car, rivalCar, traffic, streamer, duel, rival,

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { createPlateTexture, plateText, PLATE_W, PLATE_H } from './plate.js';
 import { buildCar, buildWheelGeometry } from './carBuilder.js';
 
 // 玩家車與對手車：外觀由 carBuilder 依車型參數生成，內裝用簡單幾何體。
@@ -54,10 +55,16 @@ float livMask(vec3 p) {
   const tailMat = new THREE.MeshBasicMaterial({ color: 0xff1a12 });
   const trim = new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: 0.7 });
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
+  // 車牌：前後各一片。車尾那片有牌照燈（略亮），車頭的只靠環境光
+  const plateTex = createPlateTexture(plateText(opts.plate ?? Math.floor(Math.random() * 1e9)));
+  const plateGeo = new THREE.PlaneGeometry(PLATE_W, PLATE_H);
+  const plateRear = new THREE.Mesh(plateGeo, new THREE.MeshBasicMaterial({ map: plateTex.texture, color: 0x9a9a96 }));
+  const plateFront = new THREE.Mesh(plateGeo, new THREE.MeshBasicMaterial({ map: plateTex.texture, color: 0x55554f }));
+  plateRear.rotation.y = Math.PI;
 
   // ── 外觀（可整組換掉：對手每次出場車型不同）
   const body = new THREE.Mesh(new THREE.BufferGeometry(), paint);
-  exterior.add(body);
+  exterior.add(body, plateRear, plateFront);
   const wheels = [];
   const lightMeshes = [];
   let dims = { L: 4.4, W: 1.8, H: 1.3, hoodY: 0.8, cowlZ: 0.6 };
@@ -171,6 +178,8 @@ float livMask(vec3 p) {
     };
     addLights(built.head, headMat);
     addLights(built.tail, tailMat);
+    plateRear.position.set(0, built.plate.rear.y, built.plate.rear.z);
+    plateFront.position.set(0, built.plate.front.y, built.plate.front.z);
     shadow.scale.set(dims.W + 0.9, dims.L + 1.0, 1);
     liv.uLivD.value.set(dims.L, dims.W, dims.H);
     // 光圈在貼圖裡佔 60×76／128，換算成比車身輪廓略大一圈
@@ -290,6 +299,8 @@ float livMask(vec3 p) {
     get dims() { return dims; },
     /** 換車型與顏色（對手每次出場用） */
     setSpec,
+    /** 換車牌號碼（n：任意整數，同一個數字永遠是同一張牌） */
+    setPlate(n) { plateTex.set(plateText(n)); },
     /**
      * 外觀：{ color, color2, pattern（0 = 單色，其餘見著色器）, led（顏色或 null）, glyph（標誌的字或 null）, name, taunts[] }
      */

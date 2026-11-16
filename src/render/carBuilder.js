@@ -270,8 +270,15 @@ export function buildCar(spec, opts = {}) {
   else if (tl === 'round') for (const sx of [1, -1]) for (const k of [0.46, 0.78]) tailL.push({ x: sx * tw * k, y: ty, z: tz, w: 0.13, h: 0.13, d: 0.03 });
   else if (tl === 'tall') for (const sx of [1, -1]) tailL.push({ x: sx * tw * 0.84, y: ty + 0.1, z: tz, w: 0.12, h: 0.34, d: 0.03 });
 
+  // ── 車牌的位置（另外貼圖畫）：車尾在尾燈下方（橫條尾燈中間本來就留了位置），車頭在保桿上
+  const endY = (lo, hi, k) => lerp(lo, hi, k);
+  const plate = {
+    rear: { y: tl === 'wide' ? ty : Math.max(clr + 0.24, endY(clr + 0.12, tail.h - tail.drop, 0.3)), z: zR - (ex.exhaust || ex.diffuser ? 0.045 : 0.02) },
+    front: { y: clr + 0.24, z: zF + 0.04 },
+  };
+
   return {
-    geometry: m.geometry(), wheels, head, tail: tailL,
+    geometry: m.geometry(), wheels, head, tail: tailL, plate,
     dims: { L, W: spec.W, H, hoodY: hoodAt(frontAxle), cowlY: baseF, cowlZ, tailY: ty, noseY: ny },
   };
 }
